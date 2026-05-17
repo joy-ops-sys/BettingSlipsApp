@@ -11,7 +11,7 @@ export default async function handler(req, res) {
       .eq('date', today)
       .order('payout', { ascending: false })
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: error.message, code: error.code, details: error.details, hint: error.hint })
     return res.status(200).json({ entries: data })
   }
 
@@ -28,7 +28,7 @@ export default async function handler(req, res) {
       .select()
       .single()
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: error.message, code: error.code, details: error.details, hint: error.hint })
     return res.status(201).json({ entry: data })
   }
 
