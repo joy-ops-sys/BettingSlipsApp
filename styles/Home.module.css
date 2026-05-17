@@ -421,6 +421,59 @@
 
 /* Mobile tweaks */
 @media (max-width: 480px) {
-  .logo { font-size: 28px; }
-  .entry { grid-template-columns: 26px 1fr auto; gap: 8px; padding: 12px; }
+  .container { padding: 1rem 0.75rem 6rem; }
+
+  /* Header */
+  .logo { font-size: 26px; }
+  .submitBtn { padding: 9px 14px; font-size: 12px; }
+
+  /* Tabs — scrollable row */
+  .tabs {
+    gap: 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { padding: 7px 12px; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
+
+  /* Entries */
+  .entry { grid-template-columns: 24px 1fr auto; gap: 8px; padding: 11px 12px; }
+  .rank { font-size: 18px; }
+  .entryName { font-size: 13px; }
+  .entryDesc { font-size: 11px; }
+  .mainVal { font-size: 13px; }
+  .subVal { font-size: 10px; }
+  .statusBadge { font-size: 9px; padding: 1px 5px; }
+
+  /* Modal — full screen on mobile */
+  .overlay { align-items: flex-end; padding: 0; }
+  .modal {
+    border-radius: 20px 20px 0 0;
+    max-height: 95vh;
+    padding: 1.25rem 1rem 2rem;
+  }
+  .modalTitle { font-size: 20px; }
+
+  /* Form grid — single column on small screens */
+  .formGrid { grid-template-columns: 1fr; }
+  .fullWidth { grid-column: 1; }
+
+  /* Status selector */
+  .statusOption { font-size: 12px; padding: 7px 4px; }
+
+  /* Bigger touch targets for buttons */
+  .primaryBtn { padding: 13px; font-size: 15px; }
+  .secondaryBtn { padding: 13px 16px; font-size: 15px; }
+  .wonBtn, .lostBtn { padding: 5px 10px; font-size: 16px; }
+
+  /* X post */
+  .xpost { padding: 12px; }
+  .xpostText { font-size: 11px; }
+
+  /* Install banner */
+  .installBanner { padding: 10px 12px; gap: 8px; }
+  .installTitle { font-size: 12px; }
+  .installSub { font-size: 10px; }
 }
