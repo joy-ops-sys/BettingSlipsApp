@@ -1,4 +1,4 @@
-import { getServiceClient } from '../../lib/supabase'
+import { getServiceClient } from '../../../lib/supabase'
 
 export default async function handler(req, res) {
   const supabase = getServiceClient()
@@ -16,15 +16,15 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { name, odds, stake, payout, description, image_url } = req.body
+    const { name, odds, stake, payout, description, image_url, bet_status } = req.body
 
-    if (!name || !odds || !stake || !payout || !description) {
+    if (!name || !odds || !stake || !description) {
       return res.status(400).json({ error: 'Missing required fields' })
     }
 
     const { data, error } = await supabase
       .from('entries')
-      .insert([{ name, odds, stake: Number(stake), payout: Number(payout), description, image_url, date: today }])
+      .insert([{ name, odds, stake: Number(stake), payout: Number(payout), description, image_url, bet_status: bet_status || 'won', date: today }])
       .select()
       .single()
 
