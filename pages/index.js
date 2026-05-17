@@ -311,9 +311,7 @@ return (
           <div className={styles.xpost}>
             <div className={styles.xpostLabel}>𝕏 Today&apos;s post preview</div>
             <pre className={styles.xpostText}>{buildXPost()}</pre>
-            <button className={styles.copyBtn} onClick={copyXPost}>
-              {copied ? '✓ Copied!' : 'Copy post text'}
-            </button>
+          
           </div>
         )}
 
