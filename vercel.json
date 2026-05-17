@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/post-leaderboard",
+      "schedule": "0 14 * * *"
+    }
+  ]
+}
