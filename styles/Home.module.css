@@ -1,7 +1,7 @@
 .container {
   max-width: 680px;
   margin: 0 auto;
-  padding: 1.5rem 1rem 4rem;
+  padding: 2rem 1rem 4rem;
   min-height: 100vh;
 }
 
@@ -267,17 +267,7 @@
   white-space: pre-wrap;
   line-height: 1.7;
 }
-.copyBtn {
-  margin-top: 12px;
-  padding: 7px 14px;
-  background: transparent;
-  border: 0.5px solid rgba(255,255,255,0.12);
-  border-radius: 8px;
-  font-size: 12px;
-  color: #888;
-  transition: all 0.15s;
-}
-.copyBtn:hover { background: #1c1c1c; color: #ccc; }
+
 
 /* Modal Overlay */
 .overlay {
@@ -421,7 +411,7 @@
 
 /* Mobile tweaks */
 @media (max-width: 480px) {
-  .container { padding: 1rem 0.75rem 6rem; }
+  .container { padding: 2rem 0.75rem 6rem; }
 
   /* Header */
   .logo { font-size: 26px; }
