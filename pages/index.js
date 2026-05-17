@@ -11,17 +11,11 @@ function oddsToDecimal(oddsStr) {
 }
 
 function formatMoney(n) {
-  return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 
 function todayDate() {
   return new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-}
-
-const STATUS_CONFIG = {
-  won:     { label: 'Won',     emoji: '✅', cls: 'statusWon' },
-  lost:    { label: 'Lost',    emoji: '❌', cls: 'statusLost' },
-  pending: { label: 'Pending', emoji: '⏳', cls: 'statusPending' },
 }
 
 export default function Home() {
@@ -33,7 +27,7 @@ export default function Home() {
   const [imageBase64, setImageBase64] = useState(null)
   const [mediaType, setMediaType] = useState('image/jpeg')
   const [fileName, setFileName] = useState('')
-  const [form, setForm] = useState({ name: '', odds: '', stake: '', payout: '', description: '', betStatus: 'won' })
+  const [form, setForm] = useState({ name: '', odds: '', stake: '', payout: '', description: '' })
   const [status, setStatus] = useState({ msg: '', type: '' })
   const [submitting, setSubmitting] = useState(false)
   const [aiReading, setAiReading] = useState(false)
@@ -67,10 +61,8 @@ export default function Home() {
 
   function sortedEntries() {
     const copy = [...entries]
-    if (tab === 'dollars') return copy.filter(e => e.bet_status === 'won').sort((a, b) => b.payout - a.payout)
-    if (tab === 'odds') return copy.filter(e => e.bet_status === 'won').sort((a, b) => oddsToDecimal(b.odds) - oddsToDecimal(a.odds))
-    if (tab === 'pending') return copy.filter(e => e.bet_status === 'pending').sort((a, b) => oddsToDecimal(b.odds) - oddsToDecimal(a.odds))
-    return copy
+    if (tab === 'dollars') return copy.sort((a, b) => b.payout - a.payout)
+    return copy.sort((a, b) => oddsToDecimal(b.odds) - oddsToDecimal(a.odds))
   }
 
   async function handleFile(e) {
@@ -103,7 +95,7 @@ export default function Home() {
         }))
         setStatus({ msg: 'Slip read — verify the fields below then submit.', type: 'ok' })
       } catch {
-        setStatus({ msg: 'Could not auto-read slip — fill in fields manually.', type: 'err' })
+        setStatus({ msg: 'Could not auto-read slip — fill in the fields manually.', type: 'err' })
       }
       setAiReading(false)
     }
@@ -115,7 +107,7 @@ export default function Home() {
     if (!form.name) return setStatus({ msg: 'Enter a name or handle.', type: 'err' })
     if (!form.odds) return setStatus({ msg: 'Enter the odds.', type: 'err' })
     if (!form.stake || isNaN(parseFloat(form.stake)) || parseFloat(form.stake) <= 0) return setStatus({ msg: 'Enter a valid stake amount.', type: 'err' })
-    if (form.betStatus !== 'pending' && (!form.payout || isNaN(parseFloat(form.payout)))) return setStatus({ msg: 'Enter a valid payout amount.', type: 'err' })
+    if (!form.payout || isNaN(parseFloat(form.payout)) || parseFloat(form.payout) < 0) return setStatus({ msg: 'Enter a valid payout amount.', type: 'err' })
     if (!form.description) return setStatus({ msg: 'Add a bet description.', type: 'err' })
 
     setSubmitting(true)
@@ -133,26 +125,16 @@ export default function Home() {
         image_url = upData.url || null
       }
 
-      const payload = {
-        name: form.name,
-        odds: form.odds,
-        stake: parseFloat(form.stake),
-        payout: form.betStatus === 'pending' ? 0 : parseFloat(form.payout),
-        description: form.description,
-        bet_status: form.betStatus,
-        image_url
-      }
-
       const r = await fetch('/api/entries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ ...form, image_url })
       })
       const data = await r.json()
       if (!r.ok) throw new Error(data.error)
 
       setEntries(prev => [...prev, data.entry])
-      setStatus({ msg: 'Added to the leaderboard! 🎉', type: 'ok' })
+      setStatus({ msg: 'Added to the leaderboard!', type: 'ok' })
       setTimeout(resetForm, 1500)
     } catch (err) {
       setStatus({ msg: 'Error: ' + err.message, type: 'err' })
@@ -160,44 +142,24 @@ export default function Home() {
     setSubmitting(false)
   }
 
-  async function handleUpdateStatus(entry, newStatus) {
-    try {
-      const r = await fetch(`/api/entries/${entry.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bet_status: newStatus })
-      })
-      if (!r.ok) throw new Error('Update failed')
-      setEntries(prev => prev.map(e => e.id === entry.id ? { ...e, bet_status: newStatus } : e))
-    } catch (err) {
-      alert('Could not update: ' + err.message)
-    }
-  }
-
   function resetForm() {
     setShowForm(false)
     setImagePreview(null)
     setImageBase64(null)
-    setForm({ name: '', odds: '', stake: '', payout: '', description: '', betStatus: 'won' })
+    setForm({ name: '', odds: '', stake: '', payout: '', description: '' })
     setStatus({ msg: '', type: '' })
     if (fileRef.current) fileRef.current.value = ''
   }
 
   function buildXPost() {
-    const wonEntries = entries.filter(e => e.bet_status === 'won')
-    const pendingEntries = entries.filter(e => e.bet_status === 'pending')
-    const dollarTop = [...wonEntries].sort((a, b) => b.payout - a.payout).slice(0, 3)
-    const oddsTop = [...wonEntries].sort((a, b) => oddsToDecimal(b.odds) - oddsToDecimal(a.odds)).slice(0, 3)
+    const dollarTop = [...entries].sort((a, b) => b.payout - a.payout).slice(0, 3)
+    const oddsTop = [...entries].sort((a, b) => oddsToDecimal(b.odds) - oddsToDecimal(a.odds)).slice(0, 3)
     const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     let post = `💰 DAILYSLIPS LEADERBOARD — ${dateStr}\n\n`
     post += `🏆 TOP $ WON\n`
     dollarTop.forEach((e, i) => { post += `${i + 1}. ${e.name} — ${formatMoney(e.payout)} (${e.odds})\n` })
     post += `\n🎲 LONGEST ODDS HIT\n`
     oddsTop.forEach((e, i) => { post += `${i + 1}. ${e.name} — ${e.odds} · ${formatMoney(e.payout)}\n` })
-    if (pendingEntries.length > 0) {
-      post += `\n🔥 STILL PENDING\n`
-      pendingEntries.slice(0, 3).forEach((e, i) => { post += `${i + 1}. ${e.name} — ${e.odds} (${e.description})\n` })
-    }
     post += `\ndailyslips.app  #SportsBetting #DailySlips`
     return post
   }
@@ -219,7 +181,6 @@ export default function Home() {
   }
 
   const sorted = sortedEntries()
-  const pendingCount = entries.filter(e => e.bet_status === 'pending').length
 
   return (
     <>
@@ -229,6 +190,7 @@ export default function Home() {
       </Head>
 
       <div className={styles.container}>
+        {/* Header */}
         <header className={styles.header}>
           <div className={styles.headerLeft}>
             <h1 className={styles.logo}>DailySlips</h1>
@@ -239,6 +201,7 @@ export default function Home() {
           </button>
         </header>
 
+        {/* Install Banner */}
         {showInstallBanner && (
           <div className={styles.installBanner}>
             <span className={styles.installIcon}>📲</span>
@@ -248,68 +211,54 @@ export default function Home() {
                 {isIOS ? 'Tap Share → "Add to Home Screen"' : 'Install DailySlips as an app'}
               </span>
             </div>
-            {!isIOS && <button className={styles.installBtn} onClick={handleInstall}>Install</button>}
+            {!isIOS && (
+              <button className={styles.installBtn} onClick={handleInstall}>Install</button>
+            )}
             <button className={styles.installClose} onClick={() => setShowInstallBanner(false)}>✕</button>
           </div>
         )}
 
+        {/* Tabs */}
         <div className={styles.tabs}>
-          <button className={`${styles.tab} ${tab === 'dollars' ? styles.tabActive : ''}`} onClick={() => setTab('dollars')}>💰 Top $ Won</button>
-          <button className={`${styles.tab} ${tab === 'odds' ? styles.tabActive : ''}`} onClick={() => setTab('odds')}>🎲 Longest Odds</button>
-          <button className={`${styles.tab} ${tab === 'pending' ? styles.tabActive : ''}`} onClick={() => setTab('pending')}>
-            🔥 Pending {pendingCount > 0 && <span className={styles.pendingCount}>{pendingCount}</span>}
+          <button className={`${styles.tab} ${tab === 'dollars' ? styles.tabActive : ''}`} onClick={() => setTab('dollars')}>
+            💰 Top $ Won
+          </button>
+          <button className={`${styles.tab} ${tab === 'odds' ? styles.tabActive : ''}`} onClick={() => setTab('odds')}>
+            🎲 Longest Odds
           </button>
         </div>
 
+        {/* Leaderboard */}
         <div className={styles.board}>
           {loading ? (
             <div className={styles.empty}>Loading today&apos;s board...</div>
           ) : sorted.length === 0 ? (
             <div className={styles.empty}>
-              <span className={styles.emptyIcon}>{tab === 'pending' ? '⏳' : '🎫'}</span>
-              <span>{tab === 'pending' ? 'No pending slips right now' : 'No slips yet today — be the first!'}</span>
+              <span className={styles.emptyIcon}>🎫</span>
+              <span>No slips yet today — be the first!</span>
             </div>
           ) : (
-            sorted.slice(0, 10).map((entry, i) => {
-              const sc = STATUS_CONFIG[entry.bet_status] || STATUS_CONFIG.won
-              const isPending = entry.bet_status === 'pending'
-              return (
-                <div key={entry.id} className={`${styles.entry} ${i === 0 && !isPending ? styles.rank1 : i === 1 && !isPending ? styles.rank2 : ''} ${isPending ? styles.entryPending : ''}`}>
-                  <span className={styles.rank}>{isPending ? sc.emoji : i + 1}</span>
-                  <div className={styles.entryInfo}>
-                    <div className={styles.entryNameRow}>
-                      <span className={styles.entryName}>{entry.name}</span>
-                      <span className={`${styles.statusBadge} ${styles[sc.cls]}`}>{sc.label}</span>
-                    </div>
-                    <span className={styles.entryDesc}>{entry.description}</span>
-                  </div>
-                  <div className={styles.entryMeta}>
-                    {isPending ? (
-                      <>
-                        <span className={styles.mainVal}>{entry.odds}</span>
-                        <span className={styles.subVal}>staked {formatMoney(entry.stake)}</span>
-                        <div className={styles.updateBtns}>
-                          <button className={styles.wonBtn} onClick={() => handleUpdateStatus(entry, 'won')}>✅</button>
-                          <button className={styles.lostBtn} onClick={() => handleUpdateStatus(entry, 'lost')}>❌</button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <span className={styles.mainVal}>
-                          {tab === 'dollars' ? <span className={styles.green}>{formatMoney(entry.payout)}</span> : entry.odds}
-                        </span>
-                        <span className={styles.subVal}>
-                          {tab === 'dollars' ? `staked ${formatMoney(entry.stake)}` : `won ${formatMoney(entry.payout)}`}
-                        </span>
-                      </>
-                    )}
-                  </div>
+            sorted.slice(0, 10).map((entry, i) => (
+              <div key={entry.id} className={`${styles.entry} ${i === 0 ? styles.rank1 : i === 1 ? styles.rank2 : ''}`}>
+                <span className={styles.rank}>{i + 1}</span>
+                <div className={styles.entryInfo}>
+                  <span className={styles.entryName}>{entry.name}</span>
+                  <span className={styles.entryDesc}>{entry.description}</span>
                 </div>
-              )
-            })
+                <div className={styles.entryMeta}>
+                  <span className={styles.mainVal}>
+                    {tab === 'dollars' ? <span className={styles.green}>{formatMoney(entry.payout)}</span> : entry.odds}
+                  </span>
+                  <span className={styles.subVal}>
+                    {tab === 'dollars' ? `staked ${formatMoney(entry.stake)}` : `won ${formatMoney(entry.payout)}`}
+                  </span>
+                </div>
+              </div>
+            ))
           )}
         </div>
 
+        {/* X Post Preview */}
         {entries.length > 0 && (
           <div className={styles.xpost}>
             <div className={styles.xpostLabel}>𝕏 Today&apos;s post preview</div>
@@ -320,8 +269,10 @@ export default function Home() {
           </div>
         )}
 
+        {/* Hidden file input */}
         <input type="file" accept="image/*" ref={fileRef} style={{ display: 'none' }} onChange={handleFile} />
 
+        {/* Submit Modal */}
         {showForm && (
           <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget && resetForm()}>
             <div className={styles.modal}>
@@ -344,16 +295,6 @@ export default function Home() {
               )}
 
               <form onSubmit={handleSubmit} className={styles.form}>
-                <div className={styles.statusSelector}>
-                  {['won', 'pending', 'lost'].map(s => (
-                    <button key={s} type="button"
-                      className={`${styles.statusOption} ${form.betStatus === s ? styles.statusOptionActive : ''} ${styles['statusOption_' + s]}`}
-                      onClick={() => setForm(f => ({ ...f, betStatus: s }))}>
-                      {STATUS_CONFIG[s].emoji} {STATUS_CONFIG[s].label}
-                    </button>
-                  ))}
-                </div>
-
                 <div className={styles.formGrid}>
                   <div className={styles.formField}>
                     <label>Your name / handle</label>
@@ -367,16 +308,14 @@ export default function Home() {
                   </div>
                   <div className={styles.formField}>
                     <label>Amount bet ($)</label>
-                    <input type="number" placeholder="50.00" min="0.01" step="0.01" value={form.stake}
+                    <input type="number" placeholder="50" min="0.01" step="0.01" value={form.stake}
                       onChange={e => setForm(f => ({ ...f, stake: e.target.value }))} />
                   </div>
-                  {form.betStatus !== 'pending' && (
-                    <div className={styles.formField}>
-                      <label>Amount {form.betStatus === 'lost' ? 'lost' : 'won'} ($)</label>
-                      <input type="number" placeholder="275.00" min="0" step="0.01" value={form.payout}
-                        onChange={e => setForm(f => ({ ...f, payout: e.target.value }))} />
-                    </div>
-                  )}
+                  <div className={styles.formField}>
+                    <label>Amount won ($)</label>
+                    <input type="number" placeholder="275" min="0" step="0.01" value={form.payout}
+                      onChange={e => setForm(f => ({ ...f, payout: e.target.value }))} />
+                  </div>
                   <div className={`${styles.formField} ${styles.fullWidth}`}>
                     <label>Bet description</label>
                     <input type="text" placeholder="Chiefs ML + Over 52.5 parlay" maxLength={80}

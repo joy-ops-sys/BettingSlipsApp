@@ -1,4 +1,4 @@
-import { getServiceClient } from '../../../lib/supabase'
+import { getServiceClient } from '../../lib/supabase'
 
 export default async function handler(req, res) {
   const supabase = getServiceClient()

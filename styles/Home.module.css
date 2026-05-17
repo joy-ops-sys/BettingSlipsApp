@@ -42,6 +42,111 @@
 .submitBtn:hover { opacity: 0.88; }
 .submitBtn:active { transform: scale(0.97); }
 
+/* Status selector */
+.statusSelector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.statusOption {
+  flex: 1;
+  padding: 8px 4px;
+  border-radius: 8px;
+  border: 0.5px solid rgba(255,255,255,0.1);
+  background: transparent;
+  color: #666;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s;
+  cursor: pointer;
+}
+.statusOption:hover { background: #1c1c1c; color: #aaa; }
+.statusOptionActive { border-color: transparent !important; color: #0a0a0a !important; }
+.statusOption_won.statusOptionActive { background: #4caf7d; }
+.statusOption_pending.statusOptionActive { background: #d4a017; }
+.statusOption_lost.statusOptionActive { background: #e05c5c; }
+
+/* Status badges on entries */
+.entryNameRow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.statusBadge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+.statusWon { background: rgba(76,175,125,0.15); color: #4caf7d; }
+.statusLost { background: rgba(224,92,92,0.15); color: #e05c5c; }
+.statusPending { background: rgba(212,160,23,0.15); color: #d4a017; }
+
+/* Pending entry */
+.entryPending { border-color: rgba(212,160,23,0.2) !important; }
+.pendingCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #d4a017;
+  color: #0a0a0a;
+  font-size: 10px;
+  font-weight: 700;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  margin-left: 4px;
+}
+
+/* Update buttons on pending entries */
+.updateBtns { display: flex; gap: 4px; margin-top: 4px; justify-content: flex-end; }
+.wonBtn, .lostBtn {
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  background: rgba(255,255,255,0.06);
+  transition: background 0.15s;
+}
+.wonBtn:hover { background: rgba(76,175,125,0.2); }
+.lostBtn:hover { background: rgba(224,92,92,0.2); }
+
+/* Install Banner */
+.installBanner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #1c1c1c;
+  border: 0.5px solid rgba(232,255,71,0.25);
+  border-radius: 12px;
+  margin-bottom: 1.25rem;
+}
+.installIcon { font-size: 22px; flex-shrink: 0; }
+.installText { flex: 1; min-width: 0; }
+.installTitle { display: block; font-size: 13px; font-weight: 600; color: #f0f0f0; }
+.installSub { display: block; font-size: 11px; color: #888; margin-top: 2px; }
+.installBtn {
+  background: #e8ff47;
+  color: #0a0a0a;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.installClose {
+  background: transparent;
+  border: none;
+  color: #555;
+  font-size: 16px;
+  padding: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
 /* Tabs */
 .tabs { display: flex; gap: 8px; margin-bottom: 1.25rem; }
 .tab {
