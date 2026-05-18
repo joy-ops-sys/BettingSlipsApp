@@ -40,7 +40,7 @@ export default function Home() {
   const [scanError, setScanError] = useState(null)
   const [showModal, setShowModal] = useState(false)
 
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState(false) // eslint-disable-line no-unused-vars
   const [installPrompt, setInstallPrompt] = useState(null)
   const [showInstallBanner, setShowInstallBanner] = useState(false)
   const [isIOS, setIsIOS] = useState(false)
