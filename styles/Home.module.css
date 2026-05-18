@@ -468,7 +468,6 @@
   .installSub { font-size: 10px; }
 }
 
-/* ── SCANNER ADDITIONS ── add these to your existing Home.module.css ── */
 
 .scanningState {
   display: flex;
