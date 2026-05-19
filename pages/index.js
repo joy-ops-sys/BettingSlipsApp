@@ -28,22 +28,21 @@ export default function Home() {
   const [entries, setEntries] = useState([])
   const [tab, setTab] = useState('dollars')
   const [loading, setLoading] = useState(true)
-
-  // Scanner state
-  const [scanStep, setScanStep] = useState('idle') // idle | scanning | confirm | submitting | success | error
+  const [showForm, setShowForm] = useState(false)
   const [imagePreview, setImagePreview] = useState(null)
   const [imageBase64, setImageBase64] = useState(null)
   const [mediaType, setMediaType] = useState('image/jpeg')
   const [fileName, setFileName] = useState('')
-  const [scanResult, setScanResult] = useState(null)
   const [form, setForm] = useState({ name: '', odds: '', stake: '', payout: '', description: '', betStatus: 'won' })
-  const [scanError, setScanError] = useState(null)
-  const [showModal, setShowModal] = useState(false)
-
-  const [copied, setCopied] = useState(false) // eslint-disable-line no-unused-vars
+  const [status, setStatus] = useState({ msg: '', type: '' })
+  const [submitting, setSubmitting] = useState(false)
+  const [aiReading, setAiReading] = useState(false)
+  const [copied, setCopied] = useState(false)
   const [installPrompt, setInstallPrompt] = useState(null)
   const [showInstallBanner, setShowInstallBanner] = useState(false)
   const [isIOS, setIsIOS] = useState(false)
+  const [scanStep, setScanStep] = useState('idle')
+  const [scanError, setScanError] = useState(null)
   const fileRef = useRef()
 
   useEffect(() => {
@@ -81,18 +80,17 @@ export default function Home() {
     if (!file) return
     setFileName(file.name)
     setMediaType(file.type || 'image/jpeg')
-
     const reader = new FileReader()
     reader.onload = async (ev) => {
       const dataUrl = ev.target.result
       const base64 = dataUrl.split(',')[1]
       setImageBase64(base64)
       setImagePreview(dataUrl)
-      setShowModal(true)
+      setShowForm(true)
       setScanStep('scanning')
       setScanError(null)
-      setScanResult(null)
-
+      setAiReading(true)
+      setStatus({ msg: 'Reading your slip with AI...', type: 'info' })
       try {
         const r = await fetch('/api/read-slip', {
           method: 'POST',
@@ -103,14 +101,14 @@ export default function Home() {
 
         if (parsed.error) throw new Error(parsed.error)
 
-        // Date validation
         if (parsed.date_error) {
           setScanError(parsed.date_error)
           setScanStep('error')
+          setStatus({ msg: '', type: '' })
+          setAiReading(false)
           return
         }
 
-        setScanResult(parsed)
         setForm(f => ({
           ...f,
           odds: parsed.odds || '',
@@ -120,18 +118,27 @@ export default function Home() {
           betStatus: parsed.bet_status || 'won',
         }))
         setScanStep('confirm')
+        setStatus({ msg: 'Slip read — verify the fields below then submit.', type: 'ok' })
       } catch (err) {
-        setScanError(err.message || 'Could not read slip — try a clearer photo.')
         setScanStep('error')
+        setScanError(err.message || 'Could not read slip — try a clearer photo.')
+        setStatus({ msg: '', type: '' })
       }
+      setAiReading(false)
     }
     reader.readAsDataURL(file)
   }
 
-  async function handleSubmit() {
-    if (!form.name) { setScanError('Enter your name or handle.'); return }
-    setScanStep('submitting')
-    setScanError(null)
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!form.name) return setStatus({ msg: 'Enter a name or handle.', type: 'err' })
+    if (!form.odds) return setStatus({ msg: 'Enter the odds.', type: 'err' })
+    if (!form.stake || isNaN(parseFloat(form.stake)) || parseFloat(form.stake) <= 0) return setStatus({ msg: 'Enter a valid stake amount.', type: 'err' })
+    if (form.betStatus !== 'pending' && (!form.payout || isNaN(parseFloat(form.payout)))) return setStatus({ msg: 'Enter a valid payout amount.', type: 'err' })
+    if (!form.description) return setStatus({ msg: 'Add a bet description.', type: 'err' })
+
+    setSubmitting(true)
+    setStatus({ msg: 'Submitting...', type: 'info' })
 
     try {
       let image_url = null
@@ -164,12 +171,12 @@ export default function Home() {
       if (!r.ok) throw new Error(data.error)
 
       setEntries(prev => [...prev, data.entry])
-      setScanStep('success')
-      setTimeout(resetScanner, 2000)
+      setStatus({ msg: 'Added to the leaderboard! 🎉', type: 'ok' })
+      setTimeout(resetForm, 1500)
     } catch (err) {
-      setScanError('Submission failed: ' + err.message)
-      setScanStep('confirm')
+      setStatus({ msg: 'Error: ' + err.message, type: 'err' })
     }
+    setSubmitting(false)
   }
 
   async function handleUpdateStatus(entry, newStatus) {
@@ -186,14 +193,14 @@ export default function Home() {
     }
   }
 
-  function resetScanner() {
-    setScanStep('idle')
-    setShowModal(false)
+  function resetForm() {
+    setShowForm(false)
     setImagePreview(null)
     setImageBase64(null)
-    setScanResult(null)
+    setScanStep('idle')
     setScanError(null)
     setForm({ name: '', odds: '', stake: '', payout: '', description: '', betStatus: 'won' })
+    setStatus({ msg: '', type: '' })
     if (fileRef.current) fileRef.current.value = ''
   }
 
@@ -248,7 +255,7 @@ export default function Home() {
             <h1 className={styles.logo}>DailySlips</h1>
             <span className={styles.date}>{todayDate()}</span>
           </div>
-          <button className={styles.submitBtn} onClick={() => { setShowModal(true); setTimeout(() => fileRef.current?.click(), 100) }}>
+          <button className={styles.submitBtn} onClick={() => { setShowForm(true); setTimeout(() => fileRef.current?.click(), 100) }}>
             + Submit Slip
           </button>
         </header>
@@ -333,84 +340,46 @@ export default function Home() {
 
         <input type="file" accept="image/*,.heic,.heif" ref={fileRef} style={{ display: 'none' }} onChange={handleFile} />
 
-        {/* SCANNER MODAL */}
-        {showModal && (
-          <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget && resetScanner()}>
+        {showForm && (
+          <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget && resetForm()}>
             <div className={styles.modal}>
               <div className={styles.modalHeader}>
                 <h2 className={styles.modalTitle}>Submit Your Slip</h2>
-                <button className={styles.closeBtn} onClick={resetScanner}>✕</button>
+                <button className={styles.closeBtn} onClick={resetForm}>✕</button>
               </div>
 
-              {/* IDLE — show upload prompt */}
-              {scanStep === 'idle' && (
+              {/* SCANNING STATE */}
+              {scanStep === 'scanning' && (
+                <>
+                  {imagePreview && <img src={imagePreview} alt="Bet slip" className={styles.preview} />}
+                  <p className={styles.aiStatus}>🤖 Reading your slip with AI...</p>
+                </>
+              )}
+
+              {/* ERROR STATE */}
+              {scanStep === 'error' && (
+                <>
+                  {imagePreview && <img src={imagePreview} alt="Bet slip" className={styles.preview} />}
+                  <p className={styles.aiStatus} style={{ color: '#e05c5c' }}>⚠️ {scanError}</p>
+                  <button className={styles.secondaryBtn} style={{ marginBottom: '12px' }} onClick={() => { setScanStep('idle'); setImagePreview(null); setImageBase64(null); if (fileRef.current) fileRef.current.value = ''; setTimeout(() => fileRef.current?.click(), 100) }}>
+                    Try Another Slip
+                  </button>
+                </>
+              )}
+
+              {/* IDLE — no image yet */}
+              {scanStep === 'idle' && !imagePreview && (
                 <div className={styles.dropzone} onClick={() => fileRef.current?.click()}>
                   <span className={styles.dropIcon}>📸</span>
-                  <p>Tap to upload your bet slip</p>
+                  <p>Tap to upload your bet slip image</p>
                   <p className={styles.dropSub}>JPG, PNG, HEIC supported</p>
                 </div>
               )}
 
-              {/* SCANNING */}
-              {scanStep === 'scanning' && (
-                <div className={styles.scanningState}>
-                  {imagePreview && <img src={imagePreview} alt="Bet slip" className={styles.preview} />}
-                  <div className={styles.scanningLabel}>
-                    <div className={styles.scanSpinner} />
-                    <span>Reading your slip with AI...</span>
-                  </div>
-                </div>
-              )}
-
-              {/* ERROR */}
-              {scanStep === 'error' && (
-                <div className={styles.scanErrorState}>
-                  {imagePreview && <img src={imagePreview} alt="Bet slip" className={styles.preview} />}
-                  <div className={styles.scanErrorMsg}>⚠️ {scanError}</div>
-                  <button className={styles.retryBtn} onClick={() => { setScanStep('idle'); setImagePreview(null); setImageBase64(null); if (fileRef.current) fileRef.current.value = '' }}>
-                    Try Another Slip
-                  </button>
-                </div>
-              )}
-
-              {/* CONFIRM */}
-              {scanStep === 'confirm' && (
-                <div className={styles.confirmState}>
-                  {imagePreview && <img src={imagePreview} alt="Bet slip" className={styles.preview} />}
-
-                  {scanResult?.sportsbook && (
-                    <div className={styles.sportsbookTag}>{scanResult.sportsbook}</div>
-                  )}
-
-                  <div className={styles.formGrid}>
-                    <div className={styles.formField}>
-                      <label>Your name / X handle</label>
-                      <input type="text" placeholder="@KyleJoy18" maxLength={30} value={form.name}
-                        onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-                    </div>
-                    <div className={styles.formField}>
-                      <label>Odds</label>
-                      <input type="text" value={form.odds}
-                        onChange={e => setForm(f => ({ ...f, odds: e.target.value }))} />
-                    </div>
-                    <div className={styles.formField}>
-                      <label>Stake ($)</label>
-                      <input type="number" value={form.stake}
-                        onChange={e => setForm(f => ({ ...f, stake: e.target.value }))} />
-                    </div>
-                    {form.betStatus !== 'pending' && (
-                      <div className={styles.formField}>
-                        <label>Payout ($)</label>
-                        <input type="number" value={form.payout}
-                          onChange={e => setForm(f => ({ ...f, payout: e.target.value }))} />
-                      </div>
-                    )}
-                    <div className={`${styles.formField} ${styles.fullWidth}`}>
-                      <label>Bet description</label>
-                      <input type="text" maxLength={80} value={form.description}
-                        onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
-                    </div>
-                  </div>
+              {/* CONFIRM — show form after successful scan */}
+              {(scanStep === 'confirm' || (imagePreview && scanStep !== 'scanning' && scanStep !== 'error')) && (
+                <form onSubmit={handleSubmit} className={styles.form}>
+                  {imagePreview && scanStep !== 'scanning' && <img src={imagePreview} alt="Bet slip" className={styles.preview} />}
 
                   <div className={styles.statusSelector}>
                     {['won', 'pending', 'lost'].map(s => (
@@ -422,34 +391,47 @@ export default function Home() {
                     ))}
                   </div>
 
-                  {scanError && <p className={styles.scanErrorMsg}>{scanError}</p>}
+                  <div className={styles.formGrid}>
+                    <div className={styles.formField}>
+                      <label>Your name / handle</label>
+                      <input type="text" placeholder="@handle" maxLength={30} value={form.name}
+                        onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+                    </div>
+                    <div className={styles.formField}>
+                      <label>Odds (e.g. +450)</label>
+                      <input type="text" placeholder="+450" value={form.odds}
+                        onChange={e => setForm(f => ({ ...f, odds: e.target.value }))} />
+                    </div>
+                    <div className={styles.formField}>
+                      <label>Amount bet ($)</label>
+                      <input type="number" placeholder="50.00" min="0.01" step="0.01" value={form.stake}
+                        onChange={e => setForm(f => ({ ...f, stake: e.target.value }))} />
+                    </div>
+                    {form.betStatus !== 'pending' && (
+                      <div className={styles.formField}>
+                        <label>Amount {form.betStatus === 'lost' ? 'lost' : 'won'} ($)</label>
+                        <input type="number" placeholder="275.00" min="0" step="0.01" value={form.payout}
+                          onChange={e => setForm(f => ({ ...f, payout: e.target.value }))} />
+                      </div>
+                    )}
+                    <div className={`${styles.formField} ${styles.fullWidth}`}>
+                      <label>Bet description</label>
+                      <input type="text" placeholder="Chiefs ML + Over 52.5 parlay" maxLength={80}
+                        value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+                    </div>
+                  </div>
+
+                  {status.msg && (
+                    <p className={`${styles.status} ${styles['status_' + status.type]}`}>{status.msg}</p>
+                  )}
 
                   <div className={styles.formActions}>
-                    <button className={styles.primaryBtn} onClick={handleSubmit}>
-                      Add to leaderboard
+                    <button type="submit" className={styles.primaryBtn} disabled={submitting || aiReading}>
+                      {submitting ? 'Submitting...' : 'Add to leaderboard'}
                     </button>
-                    <button className={styles.secondaryBtn} onClick={resetScanner}>Cancel</button>
+                    <button type="button" className={styles.secondaryBtn} onClick={resetForm}>Cancel</button>
                   </div>
-                </div>
-              )}
-
-              {/* SUBMITTING */}
-              {scanStep === 'submitting' && (
-                <div className={styles.scanningState}>
-                  {imagePreview && <img src={imagePreview} alt="Bet slip" className={styles.preview} />}
-                  <div className={styles.scanningLabel}>
-                    <div className={styles.scanSpinner} />
-                    <span>Adding to leaderboard...</span>
-                  </div>
-                </div>
-              )}
-
-              {/* SUCCESS */}
-              {scanStep === 'success' && (
-                <div className={styles.successState}>
-                  <div className={styles.successIcon}>🎉</div>
-                  <div className={styles.successMsg}>Added to the leaderboard!</div>
-                </div>
+                </form>
               )}
             </div>
           </div>
