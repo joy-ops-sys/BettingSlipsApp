@@ -95,7 +95,11 @@ export default function Home() {
         const r = await fetch('/api/read-slip', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageBase64: base64, mediaType: file.type })
+          body: JSON.stringify({
+            imageBase64: base64,
+            mediaType: file.type,
+            clientDate: new Date().toLocaleDateString('en-CA') // YYYY-MM-DD in user's local timezone
+          })
         })
         const parsed = await r.json()
 

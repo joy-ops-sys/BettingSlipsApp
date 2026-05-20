@@ -4,15 +4,20 @@ export default async function handler(req, res) {
     return res.status(405).end(`Method ${req.method} Not Allowed`)
   }
 
-  const { imageBase64, mediaType } = req.body
+  const { imageBase64, mediaType, clientDate } = req.body
   if (!imageBase64) return res.status(400).json({ error: 'No image provided' })
 
-  // Use US Central time (Chicago) since that's where the user is
-  const todayStr = new Date().toLocaleDateString('en-US', {
-    timeZone: 'America/Chicago',
-    month: 'numeric', day: 'numeric', year: 'numeric'
-  }) // e.g. "5/19/2026"
-  const [todayMonth, todayDay, todayYear] = todayStr.split('/').map(Number)
+  // Use date sent from client (their local timezone) — fallback to UTC
+  let todayMonth, todayDay, todayYear
+  if (clientDate) {
+    const [y, m, d] = clientDate.split('-').map(Number)
+    todayMonth = m; todayDay = d; todayYear = y
+  } else {
+    const now = new Date()
+    todayMonth = now.getUTCMonth() + 1
+    todayDay = now.getUTCDate()
+    todayYear = now.getUTCFullYear()
+  }
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
