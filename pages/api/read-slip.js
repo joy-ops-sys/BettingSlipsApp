@@ -7,10 +7,12 @@ export default async function handler(req, res) {
   const { imageBase64, mediaType } = req.body
   if (!imageBase64) return res.status(400).json({ error: 'No image provided' })
 
-  const today = new Date()
-  const todayMonth = today.getMonth() + 1
-  const todayDay = today.getDate()
-  const todayYear = today.getFullYear()
+  // Use US Central time (Chicago) since that's where the user is
+  const todayStr = new Date().toLocaleDateString('en-US', {
+    timeZone: 'America/Chicago',
+    month: 'numeric', day: 'numeric', year: 'numeric'
+  }) // e.g. "5/19/2026"
+  const [todayMonth, todayDay, todayYear] = todayStr.split('/').map(Number)
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -34,9 +36,9 @@ export default async function handler(req, res) {
               type: 'text',
               text: `This is a sports betting slip. Extract the data and respond ONLY with a valid JSON object, no markdown, no explanation:
 {
-  "placed_month": "month as integer 1-12 if visible, otherwise null",
-  "placed_day": "day as integer 1-31 if visible, otherwise null",
-  "placed_year": "year as integer e.g. 2026 if visible, otherwise null",
+  "placed_month": "month as integer 1-12 if visible on the slip, otherwise null",
+  "placed_day": "day as integer 1-31 if visible on the slip, otherwise null",
+  "placed_year": "year as integer e.g. 2026 if visible on the slip, otherwise null",
   "odds": "American format odds e.g. +450 or -110. For parlays use the combined odds.",
   "stake": "amount wagered as number only e.g. 10.00",
   "payout": "amount won or total payout as number only e.g. 19.62",
@@ -45,7 +47,7 @@ export default async function handler(req, res) {
   "sportsbook": "name of sportsbook e.g. FanDuel, DraftKings"
 }
 
-If a field is not visible use null for date fields, empty string for text, or 0 for numbers.`
+If a date field is not visible use null. If a text field is not visible use empty string. If a number is not visible use 0.`
             }
           ]
         }]
@@ -59,7 +61,6 @@ If a field is not visible use null for date fields, empty string for text, or 0 
     const clean = raw.replace(/```json|```/g, '').trim()
     const parsed = JSON.parse(clean)
 
-    // Server-side date validation using individual components
     const m = parseInt(parsed.placed_month)
     const d = parseInt(parsed.placed_day)
     const y = parseInt(parsed.placed_year)
@@ -71,7 +72,6 @@ If a field is not visible use null for date fields, empty string for text, or 0 
         parsed.date_error = null
       }
     } else {
-      // Date not visible — allow through
       parsed.date_error = null
     }
 
