@@ -34,7 +34,7 @@ export default async function handler(req, res) {
 
 Extract the following and respond ONLY with a valid JSON object, no markdown, no explanation:
 {
-  "date_error": "null if bet was placed today or date not visible. If placed on a different date, set to: 'Bet was placed on [date] — only today\\'s bets can be submitted.'",
+  "date_error": null,
   "placed_date": "date the bet was placed as shown on slip, or null if not visible",
   "odds": "American format odds e.g. +450 or -110. For parlays use the combined odds.",
   "stake": "amount wagered as number only e.g. 10.00",
@@ -44,7 +44,14 @@ Extract the following and respond ONLY with a valid JSON object, no markdown, no
   "sportsbook": "name of sportsbook e.g. FanDuel, DraftKings"
 }
 
-If a field is not visible use empty string for text or 0 for numbers. Set date_error to null if date is not visible on the slip.`
+IMPORTANT date validation rule:
+- Find the date the bet was PLACED on the slip (look for "PLACED:", timestamp, or date shown)
+- Today is ${today}
+- If the placed date is TODAY or NOT VISIBLE: set date_error to null
+- ONLY if the placed date is clearly a DIFFERENT calendar day than today: set date_error to "Bet was placed on [date] — only today's bets can be submitted."
+- When in doubt, set date_error to null
+
+If a field is not visible use empty string for text or 0 for numbers.`
             }
           ]
         }]
@@ -59,7 +66,7 @@ If a field is not visible use empty string for text or 0 for numbers. Set date_e
     const parsed = JSON.parse(clean)
 
     // Normalize date_error
-    if (parsed.date_error === 'null' || parsed.date_error === null || parsed.date_error === '') {
+    if (!parsed.date_error || parsed.date_error === 'null' || parsed.date_error === '') {
       parsed.date_error = null
     }
 
