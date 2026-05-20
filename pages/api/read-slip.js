@@ -7,7 +7,10 @@ export default async function handler(req, res) {
   const { imageBase64, mediaType } = req.body
   if (!imageBase64) return res.status(400).json({ error: 'No image provided' })
 
-  const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD e.g. "2026-05-19"
+  const today = new Date()
+  const todayMonth = today.getMonth() + 1
+  const todayDay = today.getDate()
+  const todayYear = today.getFullYear()
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -31,7 +34,9 @@ export default async function handler(req, res) {
               type: 'text',
               text: `This is a sports betting slip. Extract the data and respond ONLY with a valid JSON object, no markdown, no explanation:
 {
-  "placed_date": "date the bet was placed in YYYY-MM-DD format if visible, otherwise null",
+  "placed_month": "month as integer 1-12 if visible, otherwise null",
+  "placed_day": "day as integer 1-31 if visible, otherwise null",
+  "placed_year": "year as integer e.g. 2026 if visible, otherwise null",
   "odds": "American format odds e.g. +450 or -110. For parlays use the combined odds.",
   "stake": "amount wagered as number only e.g. 10.00",
   "payout": "amount won or total payout as number only e.g. 19.62",
@@ -40,7 +45,7 @@ export default async function handler(req, res) {
   "sportsbook": "name of sportsbook e.g. FanDuel, DraftKings"
 }
 
-If a field is not visible use empty string for text or 0 for numbers.`
+If a field is not visible use null for date fields, empty string for text, or 0 for numbers.`
             }
           ]
         }]
@@ -54,17 +59,19 @@ If a field is not visible use empty string for text or 0 for numbers.`
     const clean = raw.replace(/```json|```/g, '').trim()
     const parsed = JSON.parse(clean)
 
-    // Server-side date validation — more reliable than asking the AI
-    if (parsed.placed_date && parsed.placed_date !== 'null') {
-      // Normalize to YYYY-MM-DD for comparison
-      const placedDate = parsed.placed_date.slice(0, 10)
-      if (placedDate !== today) {
-        parsed.date_error = `Bet was placed on ${parsed.placed_date} — only today's bets can be submitted.`
+    // Server-side date validation using individual components
+    const m = parseInt(parsed.placed_month)
+    const d = parseInt(parsed.placed_day)
+    const y = parseInt(parsed.placed_year)
+
+    if (m && d && y) {
+      if (m !== todayMonth || d !== todayDay || y !== todayYear) {
+        parsed.date_error = `Bet was placed on ${m}/${d}/${y} — only today's bets can be submitted.`
       } else {
         parsed.date_error = null
       }
     } else {
-      // Date not visible — allow it through
+      // Date not visible — allow through
       parsed.date_error = null
     }
 
