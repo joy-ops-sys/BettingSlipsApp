@@ -7,8 +7,7 @@ export default async function handler(req, res) {
   const { imageBase64, mediaType } = req.body
   if (!imageBase64) return res.status(400).json({ error: 'No image provided' })
 
-  const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
-  const todayFormatted = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD e.g. "2026-05-19"
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -30,12 +29,9 @@ export default async function handler(req, res) {
             },
             {
               type: 'text',
-              text: `This is a sports betting slip. Today's date is ${todayFormatted} (${today}).
-
-Extract the following and respond ONLY with a valid JSON object, no markdown, no explanation:
+              text: `This is a sports betting slip. Extract the data and respond ONLY with a valid JSON object, no markdown, no explanation:
 {
-  "date_error": null,
-  "placed_date": "date the bet was placed as shown on slip, or null if not visible",
+  "placed_date": "date the bet was placed in YYYY-MM-DD format if visible, otherwise null",
   "odds": "American format odds e.g. +450 or -110. For parlays use the combined odds.",
   "stake": "amount wagered as number only e.g. 10.00",
   "payout": "amount won or total payout as number only e.g. 19.62",
@@ -43,13 +39,6 @@ Extract the following and respond ONLY with a valid JSON object, no markdown, no
   "bet_status": "won, lost, or pending based on what the slip shows",
   "sportsbook": "name of sportsbook e.g. FanDuel, DraftKings"
 }
-
-IMPORTANT date validation rule:
-- Find the date the bet was PLACED on the slip (look for "PLACED:", timestamp, or date shown)
-- Today is ${today}
-- If the placed date is TODAY or NOT VISIBLE: set date_error to null
-- ONLY if the placed date is clearly a DIFFERENT calendar day than today: set date_error to "Bet was placed on [date] — only today's bets can be submitted."
-- When in doubt, set date_error to null
 
 If a field is not visible use empty string for text or 0 for numbers.`
             }
@@ -65,8 +54,17 @@ If a field is not visible use empty string for text or 0 for numbers.`
     const clean = raw.replace(/```json|```/g, '').trim()
     const parsed = JSON.parse(clean)
 
-    // Normalize date_error
-    if (!parsed.date_error || parsed.date_error === 'null' || parsed.date_error === '') {
+    // Server-side date validation — more reliable than asking the AI
+    if (parsed.placed_date && parsed.placed_date !== 'null') {
+      // Normalize to YYYY-MM-DD for comparison
+      const placedDate = parsed.placed_date.slice(0, 10)
+      if (placedDate !== today) {
+        parsed.date_error = `Bet was placed on ${parsed.placed_date} — only today's bets can be submitted.`
+      } else {
+        parsed.date_error = null
+      }
+    } else {
+      // Date not visible — allow it through
       parsed.date_error = null
     }
 
