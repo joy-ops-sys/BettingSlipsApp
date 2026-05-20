@@ -161,6 +161,7 @@ export default function Home() {
         odds: form.odds,
         stake: parseFloat(form.stake),
         payout: form.betStatus === 'pending' ? 0 : parseFloat(form.payout),
+        potential_payout: parseFloat(form.payout) || 0,
         description: form.description,
         bet_status: form.betStatus,
         image_url
@@ -185,13 +186,19 @@ export default function Home() {
 
   async function handleUpdateStatus(entry, newStatus) {
     try {
+      const body = { bet_status: newStatus }
+      // When marking as won, use potential_payout if payout is 0
+      if (newStatus === 'won' && (!entry.payout || entry.payout === 0) && entry.potential_payout) {
+        body.payout = entry.potential_payout
+      }
       const r = await fetch(`/api/entries/${entry.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bet_status: newStatus })
+        body: JSON.stringify(body)
       })
       if (!r.ok) throw new Error('Update failed')
-      setEntries(prev => prev.map(e => e.id === entry.id ? { ...e, bet_status: newStatus } : e))
+      const data = await r.json()
+      setEntries(prev => prev.map(e => e.id === entry.id ? { ...e, bet_status: newStatus, payout: data.entry?.payout ?? e.payout } : e))
     } catch (err) {
       alert('Could not update: ' + err.message)
     }
