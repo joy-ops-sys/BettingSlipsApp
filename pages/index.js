@@ -43,7 +43,12 @@ export default function Home() {
   const [isIOS, setIsIOS] = useState(false)
   const [scanStep, setScanStep] = useState('idle')
   const [scanError, setScanError] = useState(null)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [adminPin, setAdminPin] = useState('')
+  const [adminError, setAdminError] = useState('')
   const fileRef = useRef()
+
+  const ADMIN_PIN = '0307' // Change this to your preferred PIN
 
   useEffect(() => {
     fetchEntries()
@@ -204,6 +209,17 @@ export default function Home() {
     }
   }
 
+  function checkAdmin() {
+    if (adminPin === ADMIN_PIN) {
+      setIsAdmin(true)
+      setAdminError('')
+      setAdminPin('')
+    } else {
+      setAdminError('Incorrect PIN')
+      setAdminPin('')
+    }
+  }
+
   function resetForm() {
     setShowForm(false)
     setImagePreview(null)
@@ -342,12 +358,30 @@ export default function Home() {
           )}
         </div>
 
-        {entries.length > 0 && (
+        {entries.length > 0 && isAdmin && (
           <div className={styles.xpost}>
-            <div className={styles.xpostLabel}>𝕏 Today&apos;s post preview</div>
+            <div className={styles.xpostLabel}>𝕏 Today's post preview</div>
             <pre className={styles.xpostText}>{buildXPost()}</pre>
+            <div className={styles.xpostActions}>
+              <button className={styles.copyBtn} onClick={copyXPost}>
+                {copied ? '✅ Copied!' : '📋 Copy Post'}
+              </button>
+              <a className={styles.postBtn} href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(buildXPost())}`} target="_blank" rel="noopener noreferrer">𝕏 Open in X</a>
+            </div>
           </div>
         )}
+
+        <div className={styles.adminWrap}>
+          {!isAdmin ? (
+            <div className={styles.adminRow}>
+              <input className={styles.adminInput} type="password" placeholder="Admin PIN" value={adminPin} onChange={e => setAdminPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && checkAdmin()} />
+              <button className={styles.adminBtn} onClick={checkAdmin}>Enter</button>
+            </div>
+          ) : (
+            <button className={styles.adminSignOut} onClick={() => { setIsAdmin(false); setAdminPin('') }}>Sign out of admin</button>
+          )}
+          {adminError && <p className={styles.adminError}>{adminError}</p>}
+        </div>
 
         <input type="file" accept="image/*,.heic,.heif" ref={fileRef} style={{ display: 'none' }} onChange={handleFile} />
 
