@@ -7,16 +7,16 @@ export default async function handler(req, res) {
   const { imageBase64, mediaType, clientDate } = req.body
   if (!imageBase64) return res.status(400).json({ error: 'No image provided' })
 
-  // Use date sent from client (their local timezone) — fallback to UTC
+  // Use date sent from client (their local timezone) — fallback to CST
   let todayMonth, todayDay, todayYear
   if (clientDate) {
     const [y, m, d] = clientDate.split('-').map(Number)
     todayMonth = m; todayDay = d; todayYear = y
   } else {
-    const now = new Date()
-    todayMonth = now.getUTCMonth() + 1
-    todayDay = now.getUTCDate()
-    todayYear = now.getUTCFullYear()
+    const nowCST = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }))
+    todayMonth = nowCST.getMonth() + 1
+    todayDay = nowCST.getDate()
+    todayYear = nowCST.getFullYear()
   }
 
   try {

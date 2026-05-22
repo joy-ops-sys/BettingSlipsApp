@@ -2,8 +2,12 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 export default async function handler(req, res) {
-  const today = new Date().toISOString().slice(0, 10)
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+  // All dates in CST
+  const nowCST = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }))
+  const todayCST = nowCST.toLocaleDateString('en-CA') // YYYY-MM-DD
+  const yesterdayCST = new Date(nowCST)
+  yesterdayCST.setDate(yesterdayCST.getDate() - 1)
+  const yesterdayStr = yesterdayCST.toLocaleDateString('en-CA')
 
   const headers = {
     'Content-Type': 'application/json',
@@ -13,10 +17,10 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    // Fetch today's entries + yesterday's pending bets (still live for 24hrs)
+    // Today's entries + yesterday's still-pending bets
     const [todayRes, pendingRes] = await Promise.all([
-      fetch(`${SUPABASE_URL}/rest/v1/entries?date=eq.${today}&order=payout.desc`, { headers }),
-      fetch(`${SUPABASE_URL}/rest/v1/entries?date=eq.${yesterday}&bet_status=eq.pending&order=payout.desc`, { headers })
+      fetch(`${SUPABASE_URL}/rest/v1/entries?date=eq.${todayCST}&order=payout.desc`, { headers }),
+      fetch(`${SUPABASE_URL}/rest/v1/entries?date=eq.${yesterdayStr}&bet_status=eq.pending&order=payout.desc`, { headers })
     ])
 
     const todayData = await todayRes.json()
@@ -24,7 +28,6 @@ export default async function handler(req, res) {
 
     if (!todayRes.ok) return res.status(500).json({ error: JSON.stringify(todayData) })
 
-    // Merge — today's entries first, then yesterday's still-pending
     const entries = [
       ...(Array.isArray(todayData) ? todayData : []),
       ...(Array.isArray(pendingData) ? pendingData : [])
@@ -50,7 +53,7 @@ export default async function handler(req, res) {
         description,
         image_url,
         bet_status: bet_status || 'won',
-        date: today
+        date: todayCST
       })
     })
     const data = await r.json()
