@@ -48,7 +48,7 @@ export default function Home() {
   const [adminError, setAdminError] = useState('')
   const fileRef = useRef()
 
-  const ADMIN_PIN = '0307' // Change this to your preferred PIN
+  const ADMIN_PIN = '5757' // Change this to your preferred PIN
 
   useEffect(() => {
     fetchEntries()
@@ -231,6 +231,12 @@ export default function Home() {
     if (fileRef.current) fileRef.current.value = ''
   }
 
+  function formatName(name) {
+    if (!name) return ''
+    const clean = name.replace(/^@/, '')
+    return `@${clean}`
+  }
+
   function buildXPost() {
     const wonEntries = entries.filter(e => e.bet_status === 'won')
     const pendingEntries = entries.filter(e => e.bet_status === 'pending')
@@ -239,12 +245,12 @@ export default function Home() {
     const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     let post = `💰 DAILYSLIPS LEADERBOARD — ${dateStr}\n\n`
     post += `🏆 TOP $ WON\n`
-    dollarTop.forEach((e, i) => { post += `${i + 1}. ${e.name} — ${formatMoney(e.payout)} (${e.odds})\n` })
+    dollarTop.forEach((e, i) => { post += `${i + 1}. ${formatName(e.name)} — ${formatMoney(e.payout)} (${e.odds})\n` })
     post += `\n🎲 LONGEST ODDS HIT\n`
-    oddsTop.forEach((e, i) => { post += `${i + 1}. ${e.name} — ${e.odds} · ${formatMoney(e.payout)}\n` })
+    oddsTop.forEach((e, i) => { post += `${i + 1}. ${formatName(e.name)} — ${e.odds} · ${formatMoney(e.payout)}\n` })
     if (pendingEntries.length > 0) {
       post += `\n🔥 STILL PENDING\n`
-      pendingEntries.slice(0, 3).forEach((e, i) => { post += `${i + 1}. ${e.name} — ${e.odds} (${e.description})\n` })
+      pendingEntries.slice(0, 3).forEach((e, i) => { post += `${i + 1}. ${formatName(e.name)} — ${e.odds} (${e.description})\n` })
     }
     post += `\ndailyslips.app  #SportsBetting #DailySlips`
     return post
