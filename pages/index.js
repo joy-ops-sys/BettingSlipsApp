@@ -384,16 +384,26 @@ export default function Home() {
           )}
         </div>
 
-        {entries.length > 0 && isAdmin && (
+        {isAdmin && (
           <div className={styles.xpost}>
-            <div className={styles.xpostLabel}>𝕏 Today's post preview</div>
-            <pre className={styles.xpostText}>{buildXPost()}</pre>
-            <div className={styles.xpostActions}>
-              <button className={styles.copyBtn} onClick={copyXPost}>
-                {copied ? '✅ Copied!' : '📋 Copy Post'}
-              </button>
-              <a className={styles.postBtn} href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(buildXPost())}`} target="_blank" rel="noopener noreferrer">𝕏 Open in X</a>
+            <div className={styles.xpostLabel}>
+              𝕏 {selectedDate
+                ? `${new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} post`
+                : "Today's post preview"}
             </div>
+            {entries.length > 0 ? (
+              <>
+                <pre className={styles.xpostText}>{buildXPost()}</pre>
+                <div className={styles.xpostActions}>
+                  <button className={styles.copyBtn} onClick={copyXPost}>
+                    {copied ? '✅ Copied!' : '📋 Copy Post'}
+                  </button>
+                  <a className={styles.postBtn} href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(buildXPost())}`} target="_blank" rel="noopener noreferrer">𝕏 Open in X</a>
+                </div>
+              </>
+            ) : (
+              <div className={styles.xpostEmpty}>No entries to post yet</div>
+            )}
           </div>
         )}
 
