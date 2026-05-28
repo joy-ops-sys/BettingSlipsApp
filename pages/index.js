@@ -28,7 +28,8 @@ export default function Home() {
   const [entries, setEntries] = useState([])
   const [tab, setTab] = useState('dollars')
   const [loading, setLoading] = useState(true)
-  const [selectedDate, setSelectedDate] = useState('') // empty = today
+  const todayValue = new Date().toLocaleDateString('en-CA')
+  const [selectedDate, setSelectedDate] = useState(todayValue) // default to today
   const [showForm, setShowForm] = useState(false)
   const [imagePreview, setImagePreview] = useState(null)
   const [imageBase64, setImageBase64] = useState(null)
@@ -314,14 +315,14 @@ export default function Home() {
             type="date"
             className={styles.dateInput}
             value={selectedDate}
-            max={new Date().toLocaleDateString('en-CA')}
+            max={todayValue}
             onChange={e => {
               setSelectedDate(e.target.value)
-              fetchEntries(e.target.value)
+              fetchEntries(e.target.value !== todayValue ? e.target.value : '')
             }}
           />
-          {selectedDate && (
-            <button className={styles.dateClear} onClick={() => { setSelectedDate(''); fetchEntries('') }}>
+          {selectedDate !== todayValue && (
+            <button className={styles.dateClear} onClick={() => { setSelectedDate(todayValue); fetchEntries('') }}>
               Today
             </button>
           )}
@@ -337,11 +338,11 @@ export default function Home() {
 
         <div className={styles.board}>
           {loading ? (
-            <div className={styles.empty}>Loading{selectedDate ? ` ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ' today'}&apos;s board...</div>
+            <div className={styles.empty}>Loading{selectedDate !== todayValue ? ` ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ' today'}&apos;s board...</div>
           ) : sorted.length === 0 ? (
             <div className={styles.empty}>
               <span className={styles.emptyIcon}>{tab === 'pending' ? '⏳' : '🎫'}</span>
-              <span>{tab === 'pending' ? 'No pending slips' : `No slips${selectedDate ? ` for ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ' yet today — be the first!'}`}</span>
+              <span>{tab === 'pending' ? 'No pending slips' : `No slips${selectedDate !== todayValue ? ` for ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ' yet today — be the first!'}`}</span>
             </div>
           ) : (
             sorted.slice(0, 10).map((entry, i) => {
@@ -387,7 +388,7 @@ export default function Home() {
         {isAdmin && (
           <div className={styles.xpost}>
             <div className={styles.xpostLabel}>
-              𝕏 {selectedDate
+              𝕏 {selectedDate !== todayValue
                 ? `${new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} post`
                 : "Today's post preview"}
             </div>
