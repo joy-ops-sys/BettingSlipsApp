@@ -28,6 +28,7 @@ export default function Home() {
   const [entries, setEntries] = useState([])
   const [tab, setTab] = useState('dollars')
   const [loading, setLoading] = useState(true)
+  const [selectedDate, setSelectedDate] = useState('') // empty = today
   const [showForm, setShowForm] = useState(false)
   const [imagePreview, setImagePreview] = useState(null)
   const [imageBase64, setImageBase64] = useState(null)
@@ -62,10 +63,11 @@ export default function Home() {
     })
   }, [])
 
-  async function fetchEntries() {
+  async function fetchEntries(date = '') {
     setLoading(true)
     try {
-      const r = await fetch('/api/entries')
+      const url = date ? `/api/entries?date=${date}` : '/api/entries'
+      const r = await fetch(url)
       const data = await r.json()
       setEntries(data.entries || [])
     } catch (e) { console.error(e) }
@@ -307,6 +309,24 @@ export default function Home() {
           </div>
         )}
 
+        <div className={styles.datePicker}>
+          <input
+            type="date"
+            className={styles.dateInput}
+            value={selectedDate}
+            max={new Date().toLocaleDateString('en-CA')}
+            onChange={e => {
+              setSelectedDate(e.target.value)
+              fetchEntries(e.target.value)
+            }}
+          />
+          {selectedDate && (
+            <button className={styles.dateClear} onClick={() => { setSelectedDate(''); fetchEntries('') }}>
+              Today
+            </button>
+          )}
+        </div>
+
         <div className={styles.tabs}>
           <button className={`${styles.tab} ${tab === 'dollars' ? styles.tabActive : ''}`} onClick={() => setTab('dollars')}>💰 Top $ Won</button>
           <button className={`${styles.tab} ${tab === 'odds' ? styles.tabActive : ''}`} onClick={() => setTab('odds')}>🎲 Longest Odds</button>
@@ -317,11 +337,11 @@ export default function Home() {
 
         <div className={styles.board}>
           {loading ? (
-            <div className={styles.empty}>Loading today&apos;s board...</div>
+            <div className={styles.empty}>Loading{selectedDate ? ` ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ' today'}&apos;s board...</div>
           ) : sorted.length === 0 ? (
             <div className={styles.empty}>
               <span className={styles.emptyIcon}>{tab === 'pending' ? '⏳' : '🎫'}</span>
-              <span>{tab === 'pending' ? 'No pending slips right now' : 'No slips yet today — be the first!'}</span>
+              <span>{tab === 'pending' ? 'No pending slips' : `No slips${selectedDate ? ` for ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ' yet today — be the first!'}`}</span>
             </div>
           ) : (
             sorted.slice(0, 10).map((entry, i) => {

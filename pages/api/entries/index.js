@@ -17,7 +17,16 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    // Today's entries + yesterday's still-pending bets
+    // If a specific date is requested, just fetch that date's entries
+    const requestedDate = req.query.date
+    if (requestedDate) {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/entries?date=eq.${requestedDate}&order=payout.desc`, { headers })
+      const data = await r.json()
+      if (!r.ok) return res.status(500).json({ error: JSON.stringify(data) })
+      return res.status(200).json({ entries: Array.isArray(data) ? data : [] })
+    }
+
+    // Default: today's entries + yesterday's still-pending bets
     const [todayRes, pendingRes] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/entries?date=eq.${todayCST}&order=payout.desc`, { headers }),
       fetch(`${SUPABASE_URL}/rest/v1/entries?date=eq.${yesterdayStr}&bet_status=eq.pending&order=payout.desc`, { headers })
