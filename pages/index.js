@@ -245,19 +245,28 @@ export default function Home() {
     const pendingEntries = entries.filter(e => e.bet_status === 'pending')
     const dollarTop = [...wonEntries].sort((a, b) => b.payout - a.payout).slice(0, 3)
     const oddsTop = [...wonEntries].sort((a, b) => oddsToDecimal(b.odds) - oddsToDecimal(a.odds)).slice(0, 3)
-    const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    let post = `💰 DAILYSLIPS LEADERBOARD — ${dateStr}\n\n`
+
+    const dateObj = new Date(selectedDate + 'T12:00:00')
+    const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+    let post = `💰 DAILYSLIPS — ${dateStr}\n\n`
     post += `🏆 TOP $ WON\n`
-    dollarTop.forEach((e, i) => { post += `${i + 1}. ${formatName(e.name)} — ${formatMoney(e.payout)} (${e.odds})\n` })
+    dollarTop.forEach((e, i) => {
+      post += `${i + 1}. ${formatName(e.name)} — ${formatMoney(e.payout)} (${e.odds})${e.description ? ' · ' + e.description : ''}\n`
+    })
     post += `\n🎲 LONGEST ODDS HIT\n`
-    oddsTop.forEach((e, i) => { post += `${i + 1}. ${formatName(e.name)} — ${e.odds} · ${formatMoney(e.payout)}\n` })
+    oddsTop.forEach((e, i) => {
+      post += `${i + 1}. ${formatName(e.name)} — ${e.odds} · ${formatMoney(e.payout)}${e.description ? ' · ' + e.description : ''}\n`
+    })
     if (pendingEntries.length > 0) {
       post += `\n🔥 STILL PENDING\n`
-      pendingEntries.slice(0, 3).forEach((e, i) => { post += `${i + 1}. ${formatName(e.name)} — ${e.odds} (${e.description})\n` })
-    }
-    post += `\ndailyslips.app  #SportsBetting #DailySlips`
-    return post
+      pendingEntries.slice(0, 3).forEach((e, i) => {
+        post += `${i + 1}. ${formatName(e.name)} — ${e.odds}${e.description ? ' · ' + e.description : ''}\n`
+      })
   }
+  post += `\ndailyslips.app #DailySlips #SportsBetting`
+  return post
+}
 
   async function handleInstall() {
     if (installPrompt) {
