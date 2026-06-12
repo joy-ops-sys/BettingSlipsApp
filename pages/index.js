@@ -29,13 +29,13 @@ export default function Home() {
   const [tab, setTab] = useState('dollars')
   const [loading, setLoading] = useState(true)
   const todayValue = new Date().toLocaleDateString('en-CA')
-  const [selectedDate, setSelectedDate] = useState(todayValue) // default to today
+  const [selectedDate, setSelectedDate] = useState(todayValue)
   const [showForm, setShowForm] = useState(false)
   const [imagePreview, setImagePreview] = useState(null)
   const [imageBase64, setImageBase64] = useState(null)
   const [mediaType, setMediaType] = useState('image/jpeg')
   const [fileName, setFileName] = useState('')
-  const [form, setForm] = useState({ name: '', odds: '', stake: '', payout: '', description: '', betStatus: 'won' })
+  const [form, setForm] = useState({ name: '', odds: '', stake: '', payout: '', description: '', betStatus: 'won', legs: [] })
   const [status, setStatus] = useState({ msg: '', type: '' })
   const [submitting, setSubmitting] = useState(false)
   const [aiReading, setAiReading] = useState(false)
@@ -48,9 +48,10 @@ export default function Home() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminPin, setAdminPin] = useState('')
   const [adminError, setAdminError] = useState('')
+  const [expandedEntry, setExpandedEntry] = useState(null)
   const fileRef = useRef()
 
-  const ADMIN_PIN = '5757' // Change this to your preferred PIN
+  const ADMIN_PIN = '5757'
 
   useEffect(() => {
     fetchEntries()
@@ -106,7 +107,7 @@ export default function Home() {
           body: JSON.stringify({
             imageBase64: base64,
             mediaType: file.type,
-            clientDate: new Date().toLocaleDateString('en-CA') // YYYY-MM-DD in user's local timezone
+            clientDate: new Date().toLocaleDateString('en-CA')
           })
         })
         const parsed = await r.json()
@@ -128,6 +129,7 @@ export default function Home() {
           payout: parsed.payout || '',
           description: parsed.description || '',
           betStatus: parsed.bet_status || 'won',
+          legs: parsed.legs || [],
         }))
         setScanStep('confirm')
         setStatus({ msg: 'Slip read — verify the fields below then submit.', type: 'ok' })
@@ -172,7 +174,8 @@ export default function Home() {
         potential_payout: parseFloat(form.payout) || 0,
         description: form.description,
         bet_status: form.betStatus,
-        image_url
+        image_url,
+        legs: form.legs?.length ? form.legs : null,
       }
 
       const r = await fetch('/api/entries', {
@@ -195,7 +198,6 @@ export default function Home() {
   async function handleUpdateStatus(entry, newStatus) {
     try {
       const body = { bet_status: newStatus }
-      // When marking as won, use potential_payout if payout is 0
       if (newStatus === 'won' && (!entry.payout || entry.payout === 0) && entry.potential_payout) {
         body.payout = entry.potential_payout
       }
@@ -229,7 +231,7 @@ export default function Home() {
     setImageBase64(null)
     setScanStep('idle')
     setScanError(null)
-    setForm({ name: '', odds: '', stake: '', payout: '', description: '', betStatus: 'won' })
+    setForm({ name: '', odds: '', stake: '', payout: '', description: '', betStatus: 'won', legs: [] })
     setStatus({ msg: '', type: '' })
     if (fileRef.current) fileRef.current.value = ''
   }
@@ -263,10 +265,10 @@ export default function Home() {
       pendingEntries.slice(0, 3).forEach((e, i) => {
         post += `${i + 1}. ${formatName(e.name)} — ${e.odds}${e.description ? ' · ' + e.description : ''}\n`
       })
+    }
+    post += `\ndailyslips.app #DailySlips #SportsBetting`
+    return post
   }
-  post += `\ndailyslips.app #DailySlips #SportsBetting`
-  return post
-}
 
   async function handleInstall() {
     if (installPrompt) {
@@ -357,37 +359,81 @@ export default function Home() {
             sorted.slice(0, 10).map((entry, i) => {
               const sc = STATUS_CONFIG[entry.bet_status] || STATUS_CONFIG.won
               const isPending = entry.bet_status === 'pending'
+              const isExpanded = expandedEntry === entry.id
               return (
-                <div key={entry.id} className={`${styles.entry} ${i === 0 && !isPending ? styles.rank1 : i === 1 && !isPending ? styles.rank2 : ''} ${isPending ? styles.entryPending : ''}`}>
-                  <span className={styles.rank}>{isPending ? sc.emoji : i + 1}</span>
-                  <div className={styles.entryInfo}>
-                    <div className={styles.entryNameRow}>
-                      <span className={styles.entryName}>{entry.name}</span>
-                      <span className={`${styles.statusBadge} ${styles[sc.cls]}`}>{sc.label}</span>
+                <div key={entry.id}>
+                  <div
+                    className={`${styles.entry} ${i === 0 && !isPending ? styles.rank1 : i === 1 && !isPending ? styles.rank2 : ''} ${isPending ? styles.entryPending : ''} ${isExpanded ? styles.entryExpanded0 : ''}`}
+                    onClick={() => setExpandedEntry(isExpanded ? null : entry.id)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <span className={styles.rank}>{isPending ? sc.emoji : i + 1}</span>
+                    <div className={styles.entryInfo}>
+                      <div className={styles.entryNameRow}>
+                        <span className={styles.entryName}>{entry.name}</span>
+                        <span className={`${styles.statusBadge} ${styles[sc.cls]}`}>{sc.label}</span>
+                      </div>
+                      <span className={styles.entryDesc}>{entry.description}</span>
                     </div>
-                    <span className={styles.entryDesc}>{entry.description}</span>
+                    <div className={styles.entryMeta}>
+                      {isPending ? (
+                        <>
+                          <span className={styles.mainVal}>{entry.odds}</span>
+                          <span className={styles.subVal}>staked {formatMoney(entry.stake)}</span>
+                          <div className={styles.updateBtns}>
+                            <button className={styles.wonBtn} onClick={e => { e.stopPropagation(); handleUpdateStatus(entry, 'won') }}>✅</button>
+                            <button className={styles.lostBtn} onClick={e => { e.stopPropagation(); handleUpdateStatus(entry, 'lost') }}>❌</button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <span className={styles.mainVal}>
+                            {tab === 'dollars' ? <span className={styles.green}>{formatMoney(entry.payout)}</span> : entry.odds}
+                          </span>
+                          <span className={styles.subVal}>
+                            {tab === 'dollars' ? `staked ${formatMoney(entry.stake)}` : `won ${formatMoney(entry.payout)}`}
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div className={styles.entryMeta}>
-                    {isPending ? (
-                      <>
-                        <span className={styles.mainVal}>{entry.odds}</span>
-                        <span className={styles.subVal}>staked {formatMoney(entry.stake)}</span>
-                        <div className={styles.updateBtns}>
-                          <button className={styles.wonBtn} onClick={() => handleUpdateStatus(entry, 'won')}>✅</button>
-                          <button className={styles.lostBtn} onClick={() => handleUpdateStatus(entry, 'lost')}>❌</button>
+
+                  {isExpanded && (
+                    <div className={styles.entryExpanded}>
+                      {entry.legs && entry.legs.length > 0 ? (
+                        <>
+                          <div className={styles.legsTitle}>
+                            {entry.legs.length === 1 ? 'Bet Details' : `Parlay — ${entry.legs.length} Legs`}
+                          </div>
+                          {entry.legs.map((leg, li) => {
+                            const legSc = leg.status ? STATUS_CONFIG[leg.status] || STATUS_CONFIG.pending : null
+                            return (
+                              <div key={li} className={styles.legRow}>
+                                <div className={styles.legInfo}>
+                                  <span className={styles.legSelection}>{leg.selection}</span>
+                                  <span className={styles.legMarket}>{leg.market}</span>
+                                </div>
+                                <div className={styles.legMeta}>
+                                  {leg.odds && <span className={styles.legOdds}>{leg.odds}</span>}
+                                  {legSc && <span className={styles.legStatus}>{legSc.emoji}</span>}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </>
+                      ) : (
+                        <div className={styles.legsTitle}>
+                          {entry.description}<br />
+                          <span style={{ color: '#555', fontSize: '11px' }}>Odds: {entry.odds} · Stake: {formatMoney(entry.stake)}</span>
                         </div>
-                      </>
-                    ) : (
-                      <>
-                        <span className={styles.mainVal}>
-                          {tab === 'dollars' ? <span className={styles.green}>{formatMoney(entry.payout)}</span> : entry.odds}
-                        </span>
-                        <span className={styles.subVal}>
-                          {tab === 'dollars' ? `staked ${formatMoney(entry.stake)}` : `won ${formatMoney(entry.payout)}`}
-                        </span>
-                      </>
-                    )}
-                  </div>
+                      )}
+                      {entry.image_url && (
+                        <a href={entry.image_url} target="_blank" rel="noopener noreferrer" className={styles.viewSlipBtn}>
+                          View Slip 🎫
+                        </a>
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             })
@@ -439,7 +485,6 @@ export default function Home() {
                 <button className={styles.closeBtn} onClick={resetForm}>✕</button>
               </div>
 
-              {/* SCANNING STATE */}
               {scanStep === 'scanning' && (
                 <>
                   {imagePreview && <img src={imagePreview} alt="Bet slip" className={styles.preview} />}
@@ -447,7 +492,6 @@ export default function Home() {
                 </>
               )}
 
-              {/* ERROR STATE */}
               {scanStep === 'error' && (
                 <>
                   {imagePreview && <img src={imagePreview} alt="Bet slip" className={styles.preview} />}
@@ -458,7 +502,6 @@ export default function Home() {
                 </>
               )}
 
-              {/* IDLE — no image yet */}
               {scanStep === 'idle' && !imagePreview && (
                 <div className={styles.dropzone} onClick={() => fileRef.current?.click()}>
                   <span className={styles.dropIcon}>📸</span>
@@ -467,7 +510,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* CONFIRM — show form after successful scan */}
               {(scanStep === 'confirm' || (imagePreview && scanStep !== 'scanning' && scanStep !== 'error')) && (
                 <form onSubmit={handleSubmit} className={styles.form}>
                   {imagePreview && scanStep !== 'scanning' && <img src={imagePreview} alt="Bet slip" className={styles.preview} />}

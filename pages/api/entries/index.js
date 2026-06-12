@@ -2,9 +2,8 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 export default async function handler(req, res) {
-  // All dates in CST
   const nowCST = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }))
-  const todayCST = nowCST.toLocaleDateString('en-CA') // YYYY-MM-DD
+  const todayCST = nowCST.toLocaleDateString('en-CA')
   const yesterdayCST = new Date(nowCST)
   yesterdayCST.setDate(yesterdayCST.getDate() - 1)
   const yesterdayStr = yesterdayCST.toLocaleDateString('en-CA')
@@ -17,7 +16,6 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    // If a specific date is requested, just fetch that date's entries
     const requestedDate = req.query.date
     if (requestedDate) {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/entries?date=eq.${requestedDate}&order=payout.desc`, { headers })
@@ -26,7 +24,6 @@ export default async function handler(req, res) {
       return res.status(200).json({ entries: Array.isArray(data) ? data : [] })
     }
 
-    // Default: today's entries + yesterday's still-pending bets
     const [todayRes, pendingRes] = await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/entries?date=eq.${todayCST}&order=payout.desc`, { headers }),
       fetch(`${SUPABASE_URL}/rest/v1/entries?date=eq.${yesterdayStr}&bet_status=eq.pending&order=payout.desc`, { headers })
@@ -46,7 +43,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { name, odds, stake, payout, potential_payout, description, image_url, bet_status } = req.body
+    const { name, odds, stake, payout, potential_payout, description, image_url, bet_status, legs } = req.body
     if (!name || !odds || !stake || !description) {
       return res.status(400).json({ error: 'Missing required fields' })
     }
@@ -62,7 +59,8 @@ export default async function handler(req, res) {
         description,
         image_url,
         bet_status: bet_status || 'won',
-        date: todayCST
+        date: todayCST,
+        legs: legs || null
       })
     })
     const data = await r.json()

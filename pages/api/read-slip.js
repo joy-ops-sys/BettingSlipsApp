@@ -29,7 +29,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
+        max_tokens: 1500,
         messages: [{
           role: 'user',
           content: [
@@ -44,15 +44,26 @@ export default async function handler(req, res) {
   "placed_month": "month as integer 1-12 if visible on the slip, otherwise null",
   "placed_day": "day as integer 1-31 if visible on the slip, otherwise null",
   "placed_year": "year as integer e.g. 2026 if visible on the slip, otherwise null",
-  "odds": "American format odds e.g. +450 or -110. For parlays use the combined odds.",
+  "odds": "overall American format odds e.g. +450 or -110. For parlays use the combined/total odds.",
   "stake": "amount wagered as number only e.g. 10.00",
   "payout": "amount won or total payout as number only e.g. 19.62",
-  "description": "brief bet description: teams, sport, bet type max 70 chars",
+  "description": "brief overall bet description: teams, sport, bet type max 70 chars",
   "bet_status": "won, lost, or pending based on what the slip shows",
-  "sportsbook": "name of sportsbook e.g. FanDuel, DraftKings"
+  "sportsbook": "name of sportsbook e.g. FanDuel, DraftKings",
+  "legs": [
+    {
+      "selection": "team or player selected e.g. Chiefs ML or Patrick Mahomes Over 2.5 TDs",
+      "market": "bet type e.g. Moneyline, Spread, Over/Under, Player Prop",
+      "odds": "odds for this leg e.g. -110",
+      "status": "won, lost, pending, or void"
+    }
+  ]
 }
 
-If a date field is not visible use null. If a text field is not visible use empty string. If a number is not visible use 0.`
+For a single straight bet, "legs" should have exactly 1 entry.
+For a parlay or same game parlay, "legs" should have one entry per leg.
+If leg details are not visible, return "legs" as an empty array [].
+If a field is not visible use null for date fields, empty string for text, or 0 for numbers.`
             }
           ]
         }]
