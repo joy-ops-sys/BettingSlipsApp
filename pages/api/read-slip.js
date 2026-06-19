@@ -7,17 +7,28 @@ export default async function handler(req, res) {
   const { imageBase64, mediaType, clientDate } = req.body
   if (!imageBase64) return res.status(400).json({ error: 'No image provided' })
 
-  // Use date sent from client (their local timezone) — fallback to CST
+  // Current time in CST
+  const nowCST = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }))
+  const todayCST = nowCST.toLocaleDateString('en-CA')
+
+  // Yesterday in CST
+  const yesterdayCST = new Date(nowCST)
+  yesterdayCST.setDate(yesterdayCST.getDate() - 1)
+  const yesterdayStr = yesterdayCST.toLocaleDateString('en-CA')
+
+  // Use client date as today reference
   let todayMonth, todayDay, todayYear
   if (clientDate) {
     const [y, m, d] = clientDate.split('-').map(Number)
     todayMonth = m; todayDay = d; todayYear = y
   } else {
-    const nowCST = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }))
     todayMonth = nowCST.getMonth() + 1
     todayDay = nowCST.getDate()
     todayYear = nowCST.getFullYear()
   }
+
+  // Before 10am CST = yesterday's settled bets still allowed
+  const isPre10amCST = nowCST.getHours() < 10
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -41,9 +52,12 @@ export default async function handler(req, res) {
               type: 'text',
               text: `This is a sports betting slip. Extract the data and respond ONLY with a valid JSON object, no markdown, no explanation:
 {
-  "placed_month": "month as integer 1-12 if visible on the slip, otherwise null",
-  "placed_day": "day as integer 1-31 if visible on the slip, otherwise null",
-  "placed_year": "year as integer e.g. 2026 if visible on the slip, otherwise null",
+  "settled_month": "month the bet SETTLED/WON/FINISHED as integer 1-12 if visible, otherwise null",
+  "settled_day": "day the bet SETTLED/WON/FINISHED as integer 1-31 if visible, otherwise null",
+  "settled_year": "year the bet SETTLED/WON/FINISHED as integer e.g. 2026 if visible, otherwise null",
+  "placed_month": "month the bet was PLACED as integer 1-12 if visible, otherwise null",
+  "placed_day": "day the bet was PLACED as integer 1-31 if visible, otherwise null",
+  "placed_year": "year the bet was PLACED as integer e.g. 2026 if visible, otherwise null",
   "odds": "overall American format odds e.g. +450 or -110. For parlays use the combined/total odds.",
   "stake": "amount wagered as number only e.g. 10.00",
   "payout": "amount won or total payout as number only e.g. 19.62",
@@ -52,7 +66,7 @@ export default async function handler(req, res) {
   "sportsbook": "name of sportsbook e.g. FanDuel, DraftKings",
   "legs": [
     {
-      "selection": "team or player selected e.g. Chiefs ML or Patrick Mahomes Over 2.5 TDs",
+      "selection": "team or player selected",
       "market": "bet type e.g. Moneyline, Spread, Over/Under, Player Prop",
       "odds": "odds for this leg e.g. -110",
       "status": "won, lost, pending, or void"
@@ -60,10 +74,10 @@ export default async function handler(req, res) {
   ]
 }
 
-For a single straight bet, "legs" should have exactly 1 entry.
-For a parlay or same game parlay, "legs" should have one entry per leg.
-If leg details are not visible, return "legs" as an empty array [].
-If a field is not visible use null for date fields, empty string for text, or 0 for numbers.`
+For settled date: look for when the bet was marked WON/LOST/FINISHED/SETTLED — NOT when it was placed.
+For a single straight bet, legs should have 1 entry. For a parlay, one entry per leg.
+If leg details are not visible, return legs as [].
+If a field is not visible use null for dates, empty string for text, 0 for numbers.`
             }
           ]
         }]
@@ -77,17 +91,27 @@ If a field is not visible use null for date fields, empty string for text, or 0 
     const clean = raw.replace(/```json|```/g, '').trim()
     const parsed = JSON.parse(clean)
 
-    const m = parseInt(parsed.placed_month)
-    const d = parseInt(parsed.placed_day)
-    const y = parseInt(parsed.placed_year)
+    const sm = parseInt(parsed.settled_month)
+    const sd = parseInt(parsed.settled_day)
+    const sy = parseInt(parsed.settled_year)
+    const hasSettledDate = sm && sd && sy
 
-    if (m && d && y) {
-      if (m !== todayMonth || d !== todayDay || y !== todayYear) {
-        parsed.date_error = `Bet was placed on ${m}/${d}/${y} — only today's bets can be submitted.`
-      } else {
+    if (hasSettledDate) {
+      const settledToday = sm === todayMonth && sd === todayDay && sy === todayYear
+      const settledDateStr = `${sy}-${String(sm).padStart(2,'0')}-${String(sd).padStart(2,'0')}`
+      const settledYesterday = settledDateStr === yesterdayStr
+
+      if (settledToday) {
         parsed.date_error = null
+      } else if (settledYesterday && isPre10amCST) {
+        parsed.date_error = null
+      } else if (settledYesterday && !isPre10amCST) {
+        parsed.date_error = `Bet settled on ${sm}/${sd}/${sy} — submission window closed at 10am CST.`
+      } else {
+        parsed.date_error = `Bet settled on ${sm}/${sd}/${sy} — only today's settled bets can be submitted.`
       }
     } else {
+      // No settled date visible — allow through
       parsed.date_error = null
     }
 
