@@ -52,12 +52,12 @@ export default async function handler(req, res) {
               type: 'text',
               text: `This is a sports betting slip. Extract the data and respond ONLY with a valid JSON object, no markdown, no explanation:
 {
-  "settled_month": "month the bet SETTLED/WON/FINISHED as integer 1-12 if visible, otherwise null",
-  "settled_day": "day the bet SETTLED/WON/FINISHED as integer 1-31 if visible, otherwise null",
-  "settled_year": "year the bet SETTLED/WON/FINISHED as integer e.g. 2026 if visible, otherwise null",
-  "placed_month": "month the bet was PLACED as integer 1-12 if visible, otherwise null",
-  "placed_day": "day the bet was PLACED as integer 1-31 if visible, otherwise null",
-  "placed_year": "year the bet was PLACED as integer e.g. 2026 if visible, otherwise null",
+  "settled_month": "month the bet SETTLED/WON/LOST/FINISHED as integer 1-12. ONLY fill this if the slip explicitly shows a settlement, completion, or result date — NOT the placed/bet date. If not clearly visible, use null.",
+  "settled_day": "day the bet SETTLED as integer 1-31. Same rule — only if explicitly shown as a result/finish date, otherwise null.",
+  "settled_year": "year the bet SETTLED as integer e.g. 2026. Same rule, otherwise null.",
+  "placed_month": "month the bet was PLACED/BET as integer 1-12 if visible, otherwise null",
+  "placed_day": "day the bet was PLACED/BET as integer 1-31 if visible, otherwise null",
+  "placed_year": "year the bet was PLACED/BET as integer e.g. 2026 if visible, otherwise null",
   "odds": "overall American format odds e.g. +450 or -110. For parlays use the combined/total odds.",
   "stake": "amount wagered as number only e.g. 10.00",
   "payout": "amount won or total payout as number only e.g. 19.62",
@@ -74,7 +74,7 @@ export default async function handler(req, res) {
   ]
 }
 
-For settled date: look for when the bet was marked WON/LOST/FINISHED/SETTLED — NOT when it was placed.
+IMPORTANT: settled_month/day/year should only be filled if the slip shows a date for when the bet RESULTED/FINISHED — many slips only show a placed date, in which case settled fields must be null.
 For a single straight bet, legs should have 1 entry. For a parlay, one entry per leg.
 If leg details are not visible, return legs as [].
 If a field is not visible use null for dates, empty string for text, 0 for numbers.`
