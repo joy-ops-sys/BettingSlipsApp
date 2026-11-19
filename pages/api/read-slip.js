@@ -178,6 +178,10 @@ If a field is not visible use null for dates, empty string for text, 0 for numbe
         `This bet settled on ${settledLabel} — only bets that settled today can be submitted.`,
         { settled_date: settledLabel })
     }
+
+    // A bet that settled yesterday (Chicago date) and is submitted before 10am CT
+    // belongs on yesterday's board, not today's.
+    if (settledYesterday && isPre10amCST) parsed.board_date = yesterdayStr
   }
 
   parsed.date_error = null

@@ -43,10 +43,13 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { name, odds, stake, payout, potential_payout, description, image_url, bet_status, legs } = req.body
+    const { name, odds, stake, payout, potential_payout, description, image_url, bet_status, legs, board_date } = req.body
     if (!name || !odds || !stake || !description) {
       return res.status(400).json({ error: 'Missing required fields' })
     }
+
+    // Slips that settled yesterday go on yesterday's board — only allowed before 10am CT
+    const boardDate = board_date === yesterdayStr && nowCST.getHours() < 10 ? yesterdayStr : todayCST
     const r = await fetch(`${SUPABASE_URL}/rest/v1/entries`, {
       method: 'POST',
       headers,
@@ -59,7 +62,7 @@ export default async function handler(req, res) {
         description,
         image_url,
         bet_status: bet_status || 'won',
-        date: todayCST,
+        date: boardDate,
         legs: legs || null
       })
     })

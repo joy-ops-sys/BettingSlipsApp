@@ -181,7 +181,7 @@ async function readJson(r) {
   }
 }
 
-const EMPTY_FORM = { name: '', odds: '', stake: '', payout: '', description: '', betStatus: 'won', legs: [] }
+const EMPTY_FORM = { name: '', odds: '', stake: '', payout: '', description: '', betStatus: 'won', legs: [], boardDate: '' }
 
 export default function Home() {
   const today = chicagoToday()
@@ -339,6 +339,7 @@ export default function Home() {
       description: parsed.description || '',
       betStatus: ['won', 'lost', 'pending'].includes(parsed.bet_status) ? parsed.bet_status : 'won',
       legs: Array.isArray(parsed.legs) ? parsed.legs : [],
+      boardDate: parsed.board_date || '',
     }))
     setScanStep('confirm')
   }
@@ -381,6 +382,7 @@ export default function Home() {
         bet_status: form.betStatus,
         image_url,
         legs: form.legs?.length ? form.legs : null,
+        board_date: form.boardDate || undefined,
       }
 
       const r = await fetch('/api/entries', {
@@ -392,7 +394,8 @@ export default function Home() {
       if (!r.ok) throw new Error(data.error || 'Save failed')
 
       try { localStorage.setItem('ds_handle', name) } catch {}
-      if (isToday) setEntries(prev => [...prev, data.entry])
+      if (data.entry?.date === selectedDate || (!data.entry?.date && isToday)) setEntries(prev => [...prev, data.entry])
+      setForm(f => ({ ...f, boardDate: data.entry?.date || f.boardDate }))
       setTab(form.betStatus === 'pending' ? 'pending' : 'dollars')
       setScanStep('done')
       setStatus({ msg: '', type: '' })
@@ -813,6 +816,9 @@ export default function Home() {
               <form onSubmit={handleSubmit} className={styles.form}>
                 {imagePreview && <img src={imagePreview} alt="Your bet slip" className={`${styles.preview} ${styles.previewSmall}`} />}
                 <p className={styles.confirmNote}>We read your slip — check the details, add your handle, and submit.</p>
+                {form.boardDate && form.boardDate !== today && (
+                  <p className={styles.boardNote}>This bet settled yesterday, so it goes on <b>{longDate(form.boardDate)}</b>&apos;s board.</p>
+                )}
 
                 <div className={styles.statusSelector}>
                   {['won', 'pending', 'lost'].map(s => (
@@ -876,7 +882,9 @@ export default function Home() {
             {scanStep === 'done' && (
               <div className={styles.doneState}>
                 <span className={styles.doneIcon}>🎉</span>
-                <span className={styles.doneTitle}>Your slip is on the board</span>
+                <span className={styles.doneTitle}>
+                  {form.boardDate && form.boardDate !== today ? `Added to ${longDate(form.boardDate)}\u2019s board` : 'Your slip is on the board'}
+                </span>
                 <span className={styles.doneSub}>
                   {form.betStatus === 'pending'
                     ? 'Come back when it settles and tap your slip to mark it Won or Lost.'
