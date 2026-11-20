@@ -181,7 +181,13 @@ async function readJson(r) {
   }
 }
 
-const EMPTY_FORM = { name: '', odds: '', stake: '', payout: '', description: '', betStatus: 'won', legs: [], boardDate: '' }
+const EMPTY_FORM = { name: '', odds: '', stake: '', payout: '', description: '', betStatus: 'won', legs: [], boardDate: '', scanToken: '', locked: {} }
+
+const SUBMIT_ERRORS = {
+  duplicate: "You've already submitted this slip.",
+  numbers_changed: 'The odds, bet and payout have to match your slip. Close this and upload the slip again.',
+  scan_required: 'Your scan expired. Close this and upload the slip again.',
+}
 
 export default function Home() {
   const today = chicagoToday()
@@ -206,14 +212,16 @@ export default function Home() {
   const [showAdminLogin, setShowAdminLogin] = useState(false)
   const [adminPin, setAdminPin] = useState('')
   const [adminError, setAdminError] = useState('')
+  const [adminKey, setAdminKey] = useState('')
   const [copied, setCopied] = useState(false)
+  const [shareText, setShareText] = useState('')
+  const [settledNote, setSettledNote] = useState(false)
 
   const [installPrompt, setInstallPrompt] = useState(null)
   const [showInstallBanner, setShowInstallBanner] = useState(false)
   const [isIOS, setIsIOS] = useState(false)
   const fileRef = useRef()
 
-  const ADMIN_PIN = '5757'
   const isToday = selectedDate === today
 
   useEffect(() => {
@@ -228,6 +236,10 @@ export default function Home() {
       setInstallPrompt(e)
       if (!dismissed) setShowInstallBanner(true)
     })
+    // Stay signed in as admin for this browser tab
+    let savedPin = ''
+    try { savedPin = sessionStorage.getItem('ds_admin') || '' } catch {}
+    if (savedPin) verifyAdmin(savedPin, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -340,6 +352,8 @@ export default function Home() {
       betStatus: ['won', 'lost', 'pending'].includes(parsed.bet_status) ? parsed.bet_status : 'won',
       legs: Array.isArray(parsed.legs) ? parsed.legs : [],
       boardDate: parsed.board_date || '',
+      scanToken: parsed.scan_token || '',
+      locked: parsed.locked || {},
     }))
     setScanStep('confirm')
   }
@@ -383,6 +397,7 @@ export default function Home() {
         image_url,
         legs: form.legs?.length ? form.legs : null,
         board_date: form.boardDate || undefined,
+        scan_token: form.scanToken,
       }
 
       const r = await fetch('/api/entries', {
@@ -391,11 +406,41 @@ export default function Home() {
         body: JSON.stringify(payload),
       })
       const data = await readJson(r)
-      if (!r.ok) throw new Error(data.error || 'Save failed')
+      if (!r.ok) {
+        if (SUBMIT_ERRORS[data.code]) {
+          setStatus({ msg: SUBMIT_ERRORS[data.code], type: 'err' })
+          setSubmitting(false)
+          return
+        }
+        throw new Error(data.error || 'Save failed')
+      }
 
       try { localStorage.setItem('ds_handle', name) } catch {}
-      if (data.entry?.date === selectedDate || (!data.entry?.date && isToday)) setEntries(prev => [...prev, data.entry])
-      setForm(f => ({ ...f, boardDate: data.entry?.date || f.boardDate }))
+      const entry = data.entry
+      const onThisBoard = entry?.date === selectedDate || (!entry?.date && isToday)
+      const others = entries.filter(e => e.id !== data.replaced_id && e.id !== entry?.id)
+      if (onThisBoard) setEntries([...others, entry])
+      else if (data.replaced_id) setEntries(others)
+
+      // Ready-made X post for the player to share their slip
+      const boardWord = entry?.date && entry.date !== today ? "yesterday's" : "today's"
+      if (form.betStatus === 'won') {
+        const rank = onThisBoard
+          ? [...others.filter(e => e.bet_status === 'won' && (!e.date || e.date === entry.date)), entry]
+              .sort((a, b) => b.payout - a.payout).findIndex(e => e.id === entry.id) + 1
+          : 0
+        setShareText(
+          `Just cashed ${form.odds} for ${formatMoney(entry?.payout ?? form.payout)} 💰\n` +
+          (rank ? `#${rank} on ${boardWord} DailySlips board 🏆` : `Up on ${boardWord} DailySlips board 🏆`) +
+          `\n\nThink you can top it? 👇\ndailyslips.app #DailySlips`
+        )
+      } else if (form.betStatus === 'pending') {
+        setShareText(`Locked in: ${form.description} (${form.odds}) 🎟️\nTracking it on the DailySlips board — sweat it with me 👇\ndailyslips.app #DailySlips`)
+      } else {
+        setShareText('')
+      }
+      setSettledNote(!!data.settled)
+      setForm(f => ({ ...f, boardDate: entry?.date || f.boardDate }))
       setTab(form.betStatus === 'pending' ? 'pending' : 'dollars')
       setScanStep('done')
       setStatus({ msg: '', type: '' })
@@ -418,7 +463,7 @@ export default function Home() {
       }
       const r = await fetch(`/api/entries/${entry.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-admin-pin': adminKey },
         body: JSON.stringify(body),
       })
       if (!r.ok) throw new Error('Update failed')
@@ -438,20 +483,44 @@ export default function Home() {
     setScanError(null)
     setForm(EMPTY_FORM)
     setStatus({ msg: '', type: '' })
+    setShareText('')
+    setSettledNote(false)
     if (fileRef.current) fileRef.current.value = ''
   }
 
   // ── Admin ────────────────────────────────────────────────
 
-  function checkAdmin() {
-    if (adminPin === ADMIN_PIN) {
+  async function verifyAdmin(pin, quiet = false) {
+    try {
+      const r = await fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin }),
+      })
+      const data = await readJson(r)
+      if (!r.ok) throw new Error(data.error || 'Incorrect PIN')
       setIsAdmin(true)
+      setAdminKey(pin)
       setShowAdminLogin(false)
       setAdminError('')
-    } else {
-      setAdminError('Incorrect PIN')
+      try { sessionStorage.setItem('ds_admin', pin) } catch {}
+    } catch (err) {
+      try { sessionStorage.removeItem('ds_admin') } catch {}
+      if (!quiet) setAdminError(err.message || 'Incorrect PIN')
     }
+  }
+
+  function checkAdmin() {
+    if (!adminPin) return
+    verifyAdmin(adminPin)
     setAdminPin('')
+  }
+
+  function signOutAdmin() {
+    setIsAdmin(false)
+    setAdminKey('')
+    setAdminPin('')
+    try { sessionStorage.removeItem('ds_admin') } catch {}
   }
 
   const xPost = buildBoardPost(dayEntries, selectedDate)
@@ -621,7 +690,10 @@ export default function Home() {
                   <button className={styles.entryRow} onClick={() => setExpandedEntry(isExpanded ? null : entry.id)} aria-expanded={isExpanded}>
                     <span className={styles.rank}>{isPending ? '⏳' : i + 1}</span>
                     <span className={styles.entryInfo}>
-                      <span className={styles.entryName}>{formatName(entry.name)}</span>
+                      <span className={styles.entryName}>
+                        {formatName(entry.name)}
+                        {isAdmin && entry.manual_fields && <span className={styles.typedBadge} title={`Typed in: ${entry.manual_fields}`}>typed</span>}
+                      </span>
                       <span className={styles.entryDesc}>{entry.description}</span>
                     </span>
                     <span className={styles.entryMeta}>
@@ -687,14 +759,22 @@ export default function Home() {
                             View slip ↗
                           </a>
                         )}
-                        {isPending && (
+                        {isPending && isAdmin && (
                           <div className={styles.settleRow}>
-                            <span>Settled?</span>
+                            <span>Settle:</span>
                             <button className={styles.wonBtn} onClick={() => handleUpdateStatus(entry, 'won')}>Won</button>
                             <button className={styles.lostBtn} onClick={() => handleUpdateStatus(entry, 'lost')}>Lost</button>
                           </div>
                         )}
+                        {isPending && !isAdmin && (
+                          <button className={styles.settleUpload} onClick={openUpload}>Settled? Upload the final slip</button>
+                        )}
                       </div>
+                      {isAdmin && entry.manual_fields && (
+                        <div className={styles.typedNote}>
+                          Typed in by the player (AI couldn&apos;t read it): {entry.manual_fields.replace(/,/g, ', ')}. Check the slip.
+                        </div>
+                      )}
                     </div>
                   )}
                 </article>
@@ -725,7 +805,7 @@ export default function Home() {
         <footer className={styles.footer}>
           <span>Slips that settle today can be submitted until 10am CT tomorrow.</span>
           {isAdmin ? (
-            <button className={styles.footerLink} onClick={() => { setIsAdmin(false); setAdminPin('') }}>Sign out of admin</button>
+            <button className={styles.footerLink} onClick={signOutAdmin}>Sign out of admin</button>
           ) : showAdminLogin ? (
             <div className={styles.adminRow}>
               <input
@@ -762,7 +842,7 @@ export default function Home() {
           <div className={styles.modal} role="dialog" aria-modal="true">
             <div className={styles.modalHeader}>
               <h2 className={styles.modalTitle}>
-                {scanStep === 'confirm' ? 'Check your slip' : scanStep === 'done' ? 'You’re on the board' : 'Submit your slip'}
+                {scanStep === 'confirm' ? 'Check your slip' : scanStep === 'done' ? 'Submitted' : 'Submit your slip'}
               </h2>
               <button className={styles.iconBtn} onClick={resetForm} aria-label="Close">✕</button>
             </div>
@@ -780,6 +860,7 @@ export default function Home() {
                     <li>Screenshot from <b>My Bets → Settled</b> so the result and date show</li>
                     <li>Make sure the <b>odds, wager and payout</b> are visible</li>
                     <li>Only bets that <b>settled today</b> count (yesterday&apos;s until 10am CT)</li>
+                    <li>Bet already on the board as <b>pending</b>? Upload the settled slip with the same handle and it updates</li>
                   </ul>
                 </div>
               </>
@@ -815,7 +896,10 @@ export default function Home() {
             {scanStep === 'confirm' && (
               <form onSubmit={handleSubmit} className={styles.form}>
                 {imagePreview && <img src={imagePreview} alt="Your bet slip" className={`${styles.preview} ${styles.previewSmall}`} />}
-                <p className={styles.confirmNote}>We read your slip — check the details, add your handle, and submit.</p>
+                <p className={styles.confirmNote}>
+                  We read your slip — add your X handle and submit.
+                  {Object.values(form.locked || {}).some(Boolean) && <> The <span className={styles.lockIcon}>🔒</span> numbers come straight from the slip.</>}
+                </p>
                 {form.boardDate && form.boardDate !== today && (
                   <p className={styles.boardNote}>This bet settled yesterday, so it goes on <b>{longDate(form.boardDate)}</b>&apos;s board.</p>
                 )}
@@ -824,6 +908,7 @@ export default function Home() {
                   {['won', 'pending', 'lost'].map(s => (
                     <button key={s} type="button"
                       className={`${styles.statusOption} ${form.betStatus === s ? styles.statusOptionActive : ''} ${styles['statusOption_' + s]}`}
+                      disabled={form.locked?.bet_status && form.betStatus !== s}
                       onClick={() => setForm(f => ({ ...f, betStatus: s }))}>
                       {STATUS_CONFIG[s].label}
                     </button>
@@ -841,18 +926,18 @@ export default function Home() {
                     </div>
                   </div>
                   <div className={styles.formField}>
-                    <label htmlFor="f-odds">Odds</label>
-                    <input id="f-odds" type="text" placeholder="+450" value={form.odds}
+                    <label htmlFor="f-odds">Odds{form.locked?.odds && ' 🔒'}</label>
+                    <input id="f-odds" type="text" placeholder="+450" value={form.odds} readOnly={!!form.locked?.odds}
                       onChange={e => setForm(f => ({ ...f, odds: e.target.value }))} />
                   </div>
                   <div className={styles.formField}>
-                    <label htmlFor="f-stake">Amount bet ($)</label>
-                    <input id="f-stake" type="number" inputMode="decimal" placeholder="50.00" min="0.01" step="0.01" value={form.stake}
+                    <label htmlFor="f-stake">Amount bet ($){form.locked?.stake && ' 🔒'}</label>
+                    <input id="f-stake" type="number" inputMode="decimal" placeholder="50.00" min="0.01" step="0.01" value={form.stake} readOnly={!!form.locked?.stake}
                       onChange={e => setForm(f => ({ ...f, stake: e.target.value }))} />
                   </div>
                   <div className={`${styles.formField} ${styles.fullWidth}`}>
-                    <label htmlFor="f-payout">{form.betStatus === 'pending' ? 'To win ($)' : form.betStatus === 'lost' ? 'Amount lost ($)' : 'Amount won ($)'}</label>
-                    <input id="f-payout" type="number" inputMode="decimal" placeholder="275.00" min="0" step="0.01" value={form.payout}
+                    <label htmlFor="f-payout">{form.betStatus === 'pending' ? 'To win ($)' : form.betStatus === 'lost' ? 'Amount lost ($)' : 'Amount won ($)'}{form.locked?.payout && ' 🔒'}</label>
+                    <input id="f-payout" type="number" inputMode="decimal" placeholder="275.00" min="0" step="0.01" value={form.payout} readOnly={!!form.locked?.payout}
                       onChange={e => setForm(f => ({ ...f, payout: e.target.value }))} />
                   </div>
                   <div className={`${styles.formField} ${styles.fullWidth}`}>
@@ -883,14 +968,23 @@ export default function Home() {
               <div className={styles.doneState}>
                 <span className={styles.doneIcon}>🎉</span>
                 <span className={styles.doneTitle}>
-                  {form.boardDate && form.boardDate !== today ? `Added to ${longDate(form.boardDate)}\u2019s board` : 'Your slip is on the board'}
+                  {settledNote
+                    ? `Your pending bet is now ${form.betStatus === 'won' ? 'a winner' : 'settled'}`
+                    : form.boardDate && form.boardDate !== today ? `Added to ${longDate(form.boardDate)}\u2019s board` : 'Your slip is on the board'}
                 </span>
                 <span className={styles.doneSub}>
                   {form.betStatus === 'pending'
-                    ? 'Come back when it settles and tap your slip to mark it Won or Lost.'
-                    : 'Share it — the top slips get posted on X with your handle tagged.'}
+                    ? 'When it settles, upload the final slip and your entry updates automatically.'
+                    : form.betStatus === 'won'
+                      ? 'The top slips get posted on X every morning with your handle tagged.'
+                      : 'Thanks for keeping it honest. On to the next one.'}
                 </span>
-                <button className={styles.primaryBtn} onClick={resetForm}>See the board</button>
+                {shareText && (
+                  <a className={styles.shareBtn} href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`} target="_blank" rel="noopener noreferrer">
+                    Share on 𝕏
+                  </a>
+                )}
+                <button className={shareText ? styles.secondaryBtn : styles.primaryBtn} onClick={resetForm}>See the board</button>
               </div>
             )}
           </div>

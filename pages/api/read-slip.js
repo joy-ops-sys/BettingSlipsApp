@@ -3,6 +3,8 @@
 // Codes: no_image, bad_format, not_a_slip, missing_details, unreadable,
 //        old_slip, window_closed, ai_busy, ai_timeout, ai_unavailable
 
+import { signScan, normOdds, normMoney } from '../../lib/security'
+
 export const config = {
   api: { bodyParser: { sizeLimit: '10mb' } },
   maxDuration: 60,
@@ -182,6 +184,27 @@ If a field is not visible use null for dates, empty string for text, 0 for numbe
     // A bet that settled yesterday (Chicago date) and is submitted before 10am CT
     // belongs on yesterday's board, not today's.
     if (settledYesterday && isPre10amCST) parsed.board_date = yesterdayStr
+  }
+
+  // Sign what the AI read, so these numbers can't be changed before submitting.
+  // Anything the AI couldn't find is left null and can be typed in (and gets flagged).
+  const todayStr = nowCST.toLocaleDateString('en-CA')
+  const status = ['won', 'lost', 'pending'].includes(parsed.bet_status) ? parsed.bet_status : null
+  const stake = normMoney(parsed.stake)
+  const payout = normMoney(parsed.payout)
+  const scan = {
+    odds: normOdds(parsed.odds),
+    stake: stake && stake > 0 ? stake : null,
+    payout: payout && payout > 0 ? payout : (status === 'lost' ? 0 : null),
+    bet_status: status,
+    board_date: parsed.board_date || todayStr,
+  }
+  parsed.scan_token = signScan(scan)
+  parsed.locked = {
+    odds: scan.odds !== null,
+    stake: scan.stake !== null,
+    payout: scan.payout !== null,
+    bet_status: scan.bet_status !== null,
   }
 
   parsed.date_error = null

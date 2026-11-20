@@ -862,6 +862,67 @@
 .doneSub { font-size: 13px; color: var(--text2); max-width: 320px; line-height: 1.5; margin-bottom: 10px; }
 .doneState .primaryBtn { width: 100%; flex: none; }
 
+/* Integrity: locked numbers, typed-in flags, settling */
+.formField input[readonly] {
+  color: var(--text2);
+  background: #111;
+  border-style: dashed;
+  cursor: default;
+}
+.formField input[readonly]:focus { border-color: var(--border2); }
+.statusOption:disabled { opacity: 0.3; cursor: not-allowed; }
+.statusOption:disabled:hover { background: transparent; color: var(--text2); }
+.lockIcon { font-size: 11px; }
+.typedBadge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  vertical-align: 2px;
+  color: #f0a35c;
+  background: rgba(240, 163, 92, 0.12);
+}
+.typedNote {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #f0a35c;
+  background: rgba(240, 163, 92, 0.08);
+  border: 0.5px solid rgba(240, 163, 92, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+.settleUpload {
+  margin-left: auto;
+  padding: 7px 12px;
+  border-radius: 7px;
+  border: 0.5px solid rgba(232, 255, 71, 0.35);
+  background: rgba(232, 255, 71, 0.06);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+.settleUpload:hover { background: rgba(232, 255, 71, 0.12); }
+
+/* Share after submitting */
+.shareBtn {
+  display: block;
+  width: 100%;
+  padding: 13px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: #0a0a0a;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  transition: opacity 0.15s;
+}
+.shareBtn:hover { opacity: 0.88; }
+.doneState .secondaryBtn { width: 100%; }
+
 /* ───────── Phones ───────── */
 @media (max-width: 600px) {
   .headerInner { padding: 10px 16px; }
